@@ -57,10 +57,12 @@ Extract info common to all types of target and perform a step!()
 function _extract_commons_and_run!(explorer::SimpleRWMH, replica, shared, log_potential, state::AbstractVector)
 
     is_first_scan_of_round = shared.iterators.scan == 1
+    println(typeof(state))
 
     auto_rwmh!(
         replica.rng,
         explorer,
+        log_potential,
         state,
         replica.recorders,
         replica.chain,
@@ -94,7 +96,7 @@ function auto_rwmh!(
     start_state .= state
     randn!(rng, random_walk)
     init_joint_log = LogDensityProblems.logdensity(target_log_potential, state)
-    @assert isfinite(init_joint_log) "SimpleAHMC can only be called on a configuration of positive density."
+    @assert isfinite(init_joint_log) "SimpleRWMH can only be called on a configuration of positive density."
 
     # Draw bounds for the log acceptance ratio
     selector_params = draw_parameters(explorer.step_size_selector,rng)
