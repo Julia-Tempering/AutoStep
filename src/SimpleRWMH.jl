@@ -42,7 +42,7 @@ function Pigeons.adapt_explorer(explorer::SimpleRWMH, reduced_recorders, current
     estimated_target_std_deviations = adapt_preconditioner(explorer.preconditioner, reduced_recorders)
 
     # use the mean across chains of the mean shrink/grow factor to compute a new baseline stepsize
-    updated_step_size = explorer.step_size * mean(mean.(values(value(reduced_recorders.ah_factors))))
+    updated_step_size = explorer.step_size * mean(mean.(values(value(reduced_recorders.ar_factors))))
 
     return SimpleRWMH(
         explorer.step_size_selector, updated_step_size,
@@ -95,7 +95,7 @@ function auto_rwmh!(
     # build augmented state
     start_state .= state
     randn!(rng, random_walk)
-    init_joint_log = LogDensityProblems.logdensity(target_log_potential, state)
+    init_joint_log = log_lambda(target_log_potential, state)
     @assert isfinite(init_joint_log) "SimpleRWMH can only be called on a configuration of positive density."
 
     # Draw bounds for the log acceptance ratio
@@ -142,7 +142,7 @@ function auto_rwmh!(
         @record_if_requested!(recorders, :reversibility_rate, (chain, reversibility_passed))
 
         # compute acceptance probability and MH decision
-        final_joint_log = LogDensityProblems.logdensity(target_log_potential, state)
+        final_joint_log = log_lambda(target_log_potential, state)
         probability = if reversibility_passed
             min(one(final_joint_log),
                 exp(final_joint_log - init_joint_log + reversed_jitter_log_prob - 
@@ -167,8 +167,7 @@ function auto_step_size(
         recorders, chain,
         step_size, 
         selector, 
-        selector_params, # should be the exact same in fwd and bwd pass!
-        n_leaps)
+        selector_params) # should be the exact same in fwd and bwd pass!
 
     @assert step_size > 0
 
@@ -242,12 +241,12 @@ function log_joint_difference_function(
     random_walk_before = get_buffer(recorders.buffers, :ar_ljdf_random_walk_before_buffer, dim)
     random_walk_before .= random_walk
 
-    h_before = LogDensityProblems.logdensity(target_log_potential, state)
+    h_before = log_lambda(target_log_potential, state)
     function result(step_size)
         random_walk_dynamics!(
             target_log_potential, diag_precond,
-            state, random_walk, step_size, n_leaps)
-        h_after = LogDensityProblems.logdensity(target_log_potential, state)
+            state, random_walk, step_size)
+        h_after = log_lambda(target_log_potential, state)
         state .= state_before
         random_walk .= random_walk_before
         return h_after - h_before
@@ -291,6 +290,7 @@ add_precond_recorder!(recorders, _) = recorders
 #=
 Funtions modified from hamiltonian_dynamics.jl
 =#
+log_lambda(target, state) = LogDensityProblems.logdensity(target, state)
 
 # we add tricks to make it non-allocating
 function random_walk_dynamics!(

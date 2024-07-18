@@ -2,7 +2,7 @@ module autoRWMH
 
 using Distributions: UnivariateDistribution, Uniform, Dirac, logpdf
 using DocStringExtensions
-using LogDensityProblemsAD: ADgradient
+using LogDensityProblems
 using OnlineStatsBase: value
 using Random: AbstractRNG, randn!, randexp
 using Statistics: mean
