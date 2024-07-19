@@ -11,7 +11,7 @@ $FIELDS
     """
     A [`StepSizeSelector`](@ref) controlling the strategy for selecting the step size at each iteration.
     """
-    step_size_selector::TSSS = MHSelector()
+    step_size_selector::TSSS = MHSelectorInverted()
   
     """
     Starting point for the automatic step size algorithm.
@@ -23,7 +23,7 @@ $FIELDS
     Distribution for drawing a random jitter (in log₂ space) of the deterministic
     autoRWMH step size.
     """
-    step_jitter_dist::TJitter = Dirac(0.0)
+    step_jitter_dist::TJitter = Normal(0, 0.5) #Dirac(0.0)
 
     """
     A strategy for building a preconditioner.
@@ -57,7 +57,6 @@ Extract info common to all types of target and perform a step!()
 function _extract_commons_and_run!(explorer::SimpleRWMH, replica, shared, log_potential, state::AbstractVector)
 
     is_first_scan_of_round = shared.iterators.scan == 1
-    println(typeof(state))
 
     auto_rwmh!(
         replica.rng,
@@ -254,7 +253,7 @@ function log_joint_difference_function(
     return result
 end
 
-##!!!!!!!!!!!!!!!!!!!!!!!!!
+
 ar_factors() = Pigeons.am_factors()
 
 function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
@@ -290,7 +289,7 @@ add_precond_recorder!(recorders, _) = recorders
 #=
 Funtions modified from hamiltonian_dynamics.jl
 =#
-log_lambda(target, state) = LogDensityProblems.logdensity(target, state)
+log_lambda(target, state) = target(state) #LogDensityProblems.logdensity(target, state)
 
 # we add tricks to make it non-allocating
 function random_walk_dynamics!(

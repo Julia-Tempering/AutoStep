@@ -1,6 +1,6 @@
 module autoRWMH
 
-using Distributions: UnivariateDistribution, Uniform, Dirac, logpdf
+using Distributions: UnivariateDistribution, Uniform, Dirac, logpdf, Normal
 using DocStringExtensions
 using LogDensityProblems
 using OnlineStatsBase: value

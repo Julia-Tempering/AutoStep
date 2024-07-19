@@ -12,3 +12,9 @@ pigeons(
     explorer = SimpleRWMH()
 )
 ```
+
+## Notes for Ivy: TODO
+1. KS test
+2. simulations using InferHub, InferHub-infra (with nextflow)
+3. Intro: RWMH is useful because of non-differentiable potentials()
+4. bibtex + comments
