@@ -55,13 +55,13 @@ end
 Extract info common to all types of target and perform a step!()
 =#
 function _extract_commons_and_run!(explorer::SimpleRWMH, replica, shared, log_potential, state::AbstractVector)
-
+    vec_log_potential = vectorize(log_potential, replica)
     is_first_scan_of_round = shared.iterators.scan == 1
 
     auto_rwmh!(
         replica.rng,
         explorer,
-        log_potential,
+        vec_log_potential,
         state,
         replica.recorders,
         replica.chain,
@@ -73,6 +73,12 @@ function _extract_commons_and_run!(explorer::SimpleRWMH, replica, shared, log_po
         # the fraction of time we do this decreases to zero.
         !is_first_scan_of_round
     )
+end
+
+# we add tricks to make it non-allocating
+function random_walk_dynamics!(state, step_size, diag_precond)
+    state .+= step_size .*diag_precond
+    return true
 end
 
 function auto_rwmh!(
@@ -94,7 +100,7 @@ function auto_rwmh!(
     # build augmented state
     start_state .= state
     randn!(rng, random_walk)
-    init_joint_log = log_lambda(target_log_potential, state)
+    init_joint_log = target_log_potential(state)
     @assert isfinite(init_joint_log) "SimpleRWMH can only be called on a configuration of positive density."
 
     # Draw bounds for the log acceptance ratio
@@ -114,12 +120,8 @@ function auto_rwmh!(
     proposed_jitter = rand(rng, explorer.step_jitter_dist)
 
     # move to proposed point
-    random_walk_dynamics!(
-        target_log_potential,
-        diag_precond,
-        state, random_walk, proposed_step_size
-    )
-
+    random_walk_dynamics!(state, proposed_step_size, diag_precond)
+    
     if use_mh_accept_reject
         # flip
         random_walk .*= -one(eltype(random_walk))
@@ -141,7 +143,7 @@ function auto_rwmh!(
         @record_if_requested!(recorders, :reversibility_rate, (chain, reversibility_passed))
 
         # compute acceptance probability and MH decision
-        final_joint_log = log_lambda(target_log_potential, state)
+        final_joint_log = target_log_potential(state)
         probability = if reversibility_passed
             min(one(final_joint_log),
                 exp(final_joint_log - init_joint_log + reversed_jitter_log_prob - 
@@ -240,12 +242,10 @@ function log_joint_difference_function(
     random_walk_before = get_buffer(recorders.buffers, :ar_ljdf_random_walk_before_buffer, dim)
     random_walk_before .= random_walk
 
-    h_before = log_lambda(target_log_potential, state)
+    h_before = target_log_potential(state)
     function result(step_size)
-        random_walk_dynamics!(
-            target_log_potential, diag_precond,
-            state, random_walk, step_size)
-        h_after = log_lambda(target_log_potential, state)
+        random_walk_dynamics!(state, step_size, diag_precond)
+        h_after = target_log_potential(state)
         state .= state_before
         random_walk .= random_walk_before
         return h_after - h_before
@@ -262,15 +262,21 @@ function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
         ar_factors,
         Pigeons.buffers
     ]
-    add_precond_recorder!(result, explorer.preconditioner)
+    if explorer.preconditioner isa Pigeons.AdaptedDiagonalPreconditioner
+        push!(result, Pigeons._transformed_online) # for mass matrix adaptation
+    end
     return result
 end
 
+###############################################################################
+# duplicated functions
+###############################################################################
+
 #=
-Functions duplicated from hamiltonian_samplers.jl
+Functions duplicated from GradientBasedSampler.jl
 =#
 
-Pigeons.step!(explorer::SimpleRWMH, replica, shared) = 
+Pigeons.step!(explorer::SimpleRWMH, replica, shared) =
     Pigeons.step!(explorer, replica, shared, replica.state)
 
 function Pigeons.step!(explorer::SimpleRWMH, replica, shared, state::AbstractVector)
@@ -278,25 +284,35 @@ function Pigeons.step!(explorer::SimpleRWMH, replica, shared, state::AbstractVec
     _extract_commons_and_run!(explorer, replica, shared, log_potential, state)
 end
 
+#=
+Functions duplicated from PigeonsBridgeStanExt
+=#
+
 Pigeons.step!(explorer::SimpleRWMH, replica, shared, state::Pigeons.StanState) =
     Pigeons.step!(explorer, replica, shared, state.unconstrained_parameters)
 
-add_precond_recorder!(recorders, ::Pigeons.AdaptedDiagonalPreconditioner) =
-        push!(recorders, Pigeons._transformed_online) # for mass matrix adaptation
-
-add_precond_recorder!(recorders, _) = recorders
-
 #=
-Funtions modified from hamiltonian_dynamics.jl
+Functions duplicated from PigeonsDynamicPPLExt
 =#
-log_lambda(target, state) = target(state) #LogDensityProblems.logdensity(target, state)
 
-# we add tricks to make it non-allocating
-function random_walk_dynamics!(
-    target_log_potential, 
-    diag_precond, 
-    state, random_walk, step_size)
+function Pigeons.step!(explorer::SimpleRWMH, replica, shared, vi::DynamicPPL.TypedVarInfo)
+    vector_state = Pigeons.get_buffer(replica.recorders.buffers, :flattened_vi, get_dimension(vi))
+    flatten!(vi, vector_state) # in-place DynamicPPL.getall
+    Pigeons.step!(explorer, replica, shared, vector_state)
+    DynamicPPL.setall!(replica.state, vector_state)
+end
 
-    state .+= step_size .*diag_precond
-    return true
+get_dimension(vi::DynamicPPL.TypedVarInfo) = sum(meta -> sum(length, meta.ranges), vi.metadata)
+
+function flatten!(vi::DynamicPPL.TypedVarInfo, dest::Array)
+    i = firstindex(dest)
+    for meta in vi.metadata
+        vals = meta.vals
+        for r in meta.ranges
+            N = length(r)
+            copyto!(dest, i, vals, first(r), N)
+            i += N
+        end
+    end
+    return dest
 end

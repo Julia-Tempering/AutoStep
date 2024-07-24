@@ -7,11 +7,13 @@ using OnlineStatsBase: value
 using Random: AbstractRNG, randn!, randexp
 using Statistics: mean
 
+using DynamicPPL: DynamicPPL
+
 using Pigeons
 import Pigeons: adapt_preconditioner, Preconditioner, @record_if_requested!,
-                get_buffer, build_preconditioner!, hamiltonian_dynamics!,
-                grow_step_size, shrink_step_size, MixDiagonalPreconditioner
+                get_buffer, build_preconditioner!, MixDiagonalPreconditioner
 
+include("vectorized_logpotentials.jl")
 include("StepSizeSelector.jl")
 
 export SimpleRWMH

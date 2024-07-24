@@ -2,8 +2,12 @@
 using Pkg
 Pkg.add(name="Pigeons", rev="main")
 
-using Pigeons
 using autoRWMH
+using BridgeStan
+using Distributions
+using DynamicPPL
 using HypothesisTests
+using Pigeons
 using Random
+using SplittableRandoms
 using Test
