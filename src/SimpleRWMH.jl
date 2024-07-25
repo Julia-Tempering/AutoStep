@@ -100,6 +100,7 @@ function auto_rwmh!(
     # build augmented state
     start_state .= state
     randn!(rng, random_walk)
+    random_walk .= random_walk ./ diag_precond # divide diag_precond because precond is inv std
     init_joint_log = target_log_potential(state)
     @assert isfinite(init_joint_log) "SimpleRWMH can only be called on a configuration of positive density."
 

@@ -29,3 +29,4 @@ examples/benchmarks
 benchmarks
 *.bu
 results/
+data/

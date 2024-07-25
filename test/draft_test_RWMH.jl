@@ -7,51 +7,76 @@ using Statistics
 using DataFrames
 using CSV
 
-struct MyLogPotential
-    horizontal_spread::Float64
-    vertical_spread::Float64
+function string_to_model(model) 
+    if model == "logearn_height" # dim = 3
+        ms = Pigeons.StanLogPotential("data/logearn_height_model.stan", "data/heights.json")
+    elseif model == "eight_schools_centered" # dim = 10
+        ms = Pigeons.stan_eight_schools()
+    elseif model == "earn_height" # dim = 3
+        ms = Pigeons.StanLogPotential("data/earn_height_model.stan", "data/heights.json")
+#    elseif model == "lotka_volterra"
+#        ms = lotka_volterra_model()
+    elseif model == "hmm" # dim = 104
+        ms = Pigeons.StanLogPotential("data/hmm_model.stan", "data/hmm.json")
+    elseif model == "normal"
+        ms = toy_mvn_target(50)
+    elseif model == "funnel"
+        ms = Pigeons.stan_funnel(2)
+    elseif model == "banana"
+        ms = Pigeons.stan_banana(2)
+    end 
+    return ms
 end
 
-function (log_potential::MyLogPotential)(x)
-    p1, p2 = x
-    return logpdf(Normal(0.0, log_potential.horizontal_spread), p1) + 
-    logpdf(Normal(0.0, exp(p1 / log_potential.vertical_spread)), p2)
+function string_to_explorer(explorer)
+    if explorer == "autoRWMH" 
+        ex = SimpleRWMH(step_size_selector = autoRWMH.MHSelector(), step_jitter_dist = Dirac(0.0))
+    elseif explorer == "soft_autoRWMH" 
+        ex = SimpleRWMH(step_size_selector = autoRWMH.MHSelector())
+    elseif explorer == "autoRWMH_inverted" 
+        ex = SimpleRWMH(step_jitter_dist = Dirac(0.0))
+    elseif explorer == "soft_autoRWMH_inverted" 
+        ex = SimpleRWMH()
+    elseif explorer == "slice" 
+        ex = SliceSampler()
+    elseif explorer == "autoMALA" 
+        ex = AutoMALA()
+    end
 end
 
-
-my_log_potential = MyLogPotential(3.0, 2.0)
-my_log_potential([0.5, 0.5])
-Pigeons.initialization(::MyLogPotential, ::AbstractRNG, ::Int) = [1.0, 1.0]
 
 function main()
     # simulation settings
     seeds = [1,2,3,4,5,6,7,8,9,10]
-    models = [MyLogPotential(3,2)] #[toy_mvn_target(5)]
-    explorer = [SimpleRWMH()]
+    models = ["earn_height"] #[MyLogPotential(3,2)]
+    explorers = ["autoRWMH", "soft_autoRWMH", "autoRWMH_inverted", "soft_autoRWMH_inverted", 
+        "slice", "autoMALA"]
     n_rounds = 10
+    n_chains = 1 #?????
     result = DataFrame(explorer = String[], model = String[], minESS = Float64[],
         minESSperSec = Float64[])
 
     # simulation
     for model in models
         for seed in seeds 
-            pt = pigeons(
-                target = model,
-                reference = model,
-                seed = seed, 
-                explorer = SimpleRWMH(),
-                record = [traces; record_default()],
-                n_rounds = n_rounds)
-            ess_df = MCMCChains.ess(Chains(pt))
-            time = sum(pt.shared.reports.summary.last_round_max_time)
-            push!(result, ("softRWMH_inverted", "normal5", minimum(ess_df.nt.ess),
-            minimum(ess_df.nt.ess ./ time)))
+            for explorer in explorers
+                pt = pigeons(
+                    target = string_to_model(model),
+                    # reference = model,
+                    seed = seed, 
+                    explorer = string_to_explorer(explorer),
+                    record = [traces; record_default()],
+                    n_rounds = n_rounds)
+                ess_df = MCMCChains.ess(Chains(pt))
+                time = sum(pt.shared.reports.summary.last_round_max_time)
+                push!(result, (explorer, model, minimum(ess_df.nt.ess),
+                minimum(ess_df.nt.ess ./ time)))
+            end
         end 
     end
     # Remove rows with any NaNs
     # clean_results_ESS = filter(row->!(isnan(row.minESS)), result)
-    # Plotting boxplots
-    CSV.write("results/softrwmh_inv_normal_ess.csv", result)
+    CSV.write("results/InferHub/earn_height_ess.csv", result)
 end 
 
 main()
