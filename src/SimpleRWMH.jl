@@ -76,8 +76,8 @@ function _extract_commons_and_run!(explorer::SimpleRWMH, replica, shared, log_po
 end
 
 # we add tricks to make it non-allocating
-function random_walk_dynamics!(state, step_size, diag_precond)
-    state .+= step_size .*diag_precond
+function random_walk_dynamics!(state, step_size, random_walk)
+    state .+= step_size .* random_walk
     return true
 end
 
@@ -120,7 +120,7 @@ function auto_rwmh!(
     proposed_jitter = rand(rng, explorer.step_jitter_dist)
 
     # move to proposed point
-    random_walk_dynamics!(state, proposed_step_size, diag_precond)
+    random_walk_dynamics!(state, proposed_step_size, random_walk)
     
     if use_mh_accept_reject
         # flip
@@ -244,7 +244,7 @@ function log_joint_difference_function(
 
     h_before = target_log_potential(state)
     function result(step_size)
-        random_walk_dynamics!(state, step_size, diag_precond)
+        random_walk_dynamics!(state, step_size, random_walk)
         h_after = target_log_potential(state)
         state .= state_before
         random_walk .= random_walk_before
