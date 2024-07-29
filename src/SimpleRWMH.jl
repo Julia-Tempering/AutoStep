@@ -187,7 +187,7 @@ function auto_step_size(
         elseif should_grow(selector, selector_params, initial_difference)
             grow_step_size(log_joint_difference, step_size, selector, selector_params)
         else
-            0
+            0, 0
         end
     @record_if_requested!(recorders, :explorer_n_steps, (chain, 1+n_steps))
     @record_if_requested!(recorders, :ar_factors, (chain, 2.0^exponent))
