@@ -181,7 +181,7 @@ function auto_step_size(
             recorders)
     initial_difference = log_joint_difference(step_size)
 
-    exponent =
+    n_steps, exponent =
         if should_shrink(selector, selector_params, initial_difference)
             shrink_step_size(log_joint_difference, step_size, selector, selector_params)
         elseif should_grow(selector, selector_params, initial_difference)
@@ -200,7 +200,7 @@ function grow_step_size(log_joint_difference, step_size, selector, selector_para
         step_size *= 2.0
         diff = log_joint_difference(step_size)
         if !isfinite(diff) || !should_grow(selector, selector_params, diff)
-            return n - 1 # one less step, to avoid a potential cliff-like drop in acceptance
+            return n, n - 1 # one less step, to avoid a potential cliff-like drop in acceptance
         end
         n += 1
     end
@@ -222,7 +222,7 @@ function shrink_step_size(log_joint_difference, step_size, selector, selector_pa
             error("Could not find an acceptable positive step size (selector_params: $selector_params")
         end
         if !should_shrink(selector, selector_params, diff)
-            return -n
+            return n, -n
         end
         n += 1
     end
