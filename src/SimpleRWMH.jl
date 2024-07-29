@@ -189,7 +189,7 @@ function auto_step_size(
         else
             0
         end
-
+    @record_if_requested!(recorders, :explorer_n_steps, (chain, 1+n_steps))
     @record_if_requested!(recorders, :ar_factors, (chain, 2.0^exponent))
     return exponent
 end
