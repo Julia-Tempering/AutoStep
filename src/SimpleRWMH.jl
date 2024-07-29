@@ -260,6 +260,7 @@ ar_factors() = Pigeons.am_factors()
 function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
     result = [
         Pigeons.explorer_acceptance_pr,
+        Pigeons.explorer_n_steps,
         ar_factors,
         Pigeons.buffers
     ]
