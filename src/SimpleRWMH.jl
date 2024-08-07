@@ -23,7 +23,7 @@ $FIELDS
     Distribution for drawing a random jitter (in log₂ space) of the deterministic
     autoRWMH step size.
     """
-    step_jitter_dist::TJitter = Normal(0, 0.5) #Dirac(0.0)
+    step_jitter_dist::TJitter = Normal(0, 0.5)
 
     """
     A strategy for building a preconditioner.
@@ -144,15 +144,16 @@ function auto_rwmh!(
         #     eps0*2^(reversed_exponent+z') = eps0*2^(proposed_exponent+z)
         # <=> z' = (proposed_exponent+z)-reversed_exponent
         reversed_jitter = (proposed_exponent+proposed_jitter)-reversed_exponent
-        jitter_proposal_log_ratio = logpdf(explorer.step_jitter_dist, proposed_jitter) - 
+        jitter_proposal_log_diff = logpdf(explorer.step_jitter_dist, proposed_jitter) - 
             logpdf(explorer.step_jitter_dist, reversed_jitter)
-        @record_if_requested!(recorders, :jitter_proposal_ratio, ( chain, exp(jitter_proposal_log_ratio) ))
+        @record_if_requested!(recorders, :explorer_proposal_log_diff, ( chain, jitter_proposal_log_diff ))
+
 
         # compute acceptance probability and MH decision
-        probability = if isfinite(jitter_proposal_log_ratio)
+        probability = if isfinite(jitter_proposal_log_diff)
             min(
                 one(final_joint_log), 
-                exp(final_joint_log - init_joint_log - jitter_proposal_log_ratio)
+                exp(final_joint_log - init_joint_log - jitter_proposal_log_diff)
             )
         else
             zero(final_joint_log)

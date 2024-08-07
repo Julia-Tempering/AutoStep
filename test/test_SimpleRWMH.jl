@@ -12,7 +12,7 @@
     rng = SplittableRandom(1)
 
     step_selectors = (autoRWMH.MHSelector(), autoRWMH.MHSelectorLegacy(), autoRWMH.MHSelectorInverted())
-    step_jitter_dists = (Dirac(0.0), Normal())
+    step_jitter_dists = (Dirac(0), Normal())
     foreach(Iterators.product(step_selectors, step_jitter_dists)) do (sss, jdist)
         explorer = SimpleRWMH(step_size_selector = sss, step_jitter_dist = jdist)
         @show explorer
