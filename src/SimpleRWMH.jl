@@ -92,7 +92,7 @@ function auto_rwmh!(
 
     dim = length(state)
 
-    diag_precond = get_buffer(recorders.buffers, :ar_ones_buffer, dim)
+    diag_precond = get_buffer(recorders.buffers, :ar_diag_precond, dim)
     build_preconditioner!(diag_precond, explorer.preconditioner, rng, explorer.estimated_target_std_deviations)
     start_state = get_buffer(recorders.buffers, :ar_state_buffer, dim)
     random_walk = get_buffer(recorders.buffers, :ar_walk_buffer, dim)
@@ -117,8 +117,8 @@ function auto_rwmh!(
             explorer.step_size, 
             explorer.step_size_selector,
             selector_params)
-    proposed_step_size = explorer.step_size * 2.0^proposed_exponent
     proposed_jitter = rand(rng, explorer.step_jitter_dist)
+    proposed_step_size = explorer.step_size * 2.0^(proposed_exponent+proposed_jitter)
 
     # move to proposed point
     random_walk_dynamics!(state, proposed_step_size, random_walk)
@@ -135,20 +135,25 @@ function auto_rwmh!(
                 explorer.step_size, 
                 explorer.step_size_selector,
                 selector_params)
-            # compute the jitter z' needed to return to initial position
-            #     eps0*2^(reversed_exponent+z') = eps0*2^(proposed_exponent+z)
-            # <=> z' = proposed_exponent-reversed_exponent+z
-        jitter_needed_to_return = proposed_exponent-reversed_exponent+proposed_jitter
-        reversed_jitter_log_prob = logpdf(explorer.step_jitter_dist, jitter_needed_to_return)
-        reversibility_passed = isfinite(reversed_jitter_log_prob)
+        final_joint_log = target_log_potential(state)
+        reversibility_passed = reversed_exponent == proposed_exponent
         @record_if_requested!(recorders, :reversibility_rate, (chain, reversibility_passed))
+     
+        # compute the jitter z' needed to return to initial position
+        # due to the involutive nature of the flipped leapfrog, this occurs iff
+        #     eps0*2^(reversed_exponent+z') = eps0*2^(proposed_exponent+z)
+        # <=> z' = (proposed_exponent+z)-reversed_exponent
+        reversed_jitter = (proposed_exponent+proposed_jitter)-reversed_exponent
+        jitter_proposal_log_ratio = logpdf(explorer.step_jitter_dist, proposed_jitter) - 
+            logpdf(explorer.step_jitter_dist, reversed_jitter)
+        @record_if_requested!(recorders, :jitter_proposal_ratio, ( chain, exp(jitter_proposal_log_ratio) ))
 
         # compute acceptance probability and MH decision
-        final_joint_log = target_log_potential(state)
-        probability = if reversibility_passed
-            min(one(final_joint_log),
-                exp(final_joint_log - init_joint_log + reversed_jitter_log_prob - 
-                    logpdf(explorer.step_jitter_dist, proposed_jitter)))
+        probability = if isfinite(jitter_proposal_log_ratio)
+            min(
+                one(final_joint_log), 
+                exp(final_joint_log - init_joint_log - jitter_proposal_log_ratio)
+            )
         else
             zero(final_joint_log)
         end
