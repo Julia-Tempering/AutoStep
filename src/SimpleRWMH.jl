@@ -9,6 +9,11 @@ $FIELDS
 """
 @kwdef struct SimpleRWMH{T,TPrec <: Preconditioner,TSSS <: StepSizeSelector,TJitter <: UnivariateDistribution}
     """
+    The number of steps (equivalently, direction refreshments) between swaps.
+    """
+    n_refresh::Int = 1
+
+    """
     A [`StepSizeSelector`](@ref) controlling the strategy for selecting the step size at each iteration.
     """
     step_size_selector::TSSS = MHSelectorInverted()
@@ -45,7 +50,7 @@ function Pigeons.adapt_explorer(explorer::SimpleRWMH, reduced_recorders, current
     updated_step_size = explorer.step_size * mean(mean.(values(value(reduced_recorders.ar_factors))))
 
     return SimpleRWMH(
-        explorer.step_size_selector, updated_step_size,
+        explorer.n_refresh, explorer.step_size_selector, updated_step_size,
         explorer.step_jitter_dist,
         explorer.preconditioner, estimated_target_std_deviations
     )
@@ -97,80 +102,79 @@ function auto_rwmh!(
     start_state = get_buffer(recorders.buffers, :ar_state_buffer, dim)
     random_walk = get_buffer(recorders.buffers, :ar_walk_buffer, dim)
     
-    # build augmented state
-    start_state .= state
-    randn!(rng, random_walk)
-    random_walk .= random_walk ./ diag_precond # divide diag_precond because precond is inv std
-    init_joint_log = target_log_potential(state)
-    @assert isfinite(init_joint_log) "SimpleRWMH can only be called on a configuration of positive density."
+    for _ in 1:explorer.n_refresh
+        # build augmented state
+        start_state .= state
+        randn!(rng, random_walk)
+        random_walk .= random_walk ./ diag_precond # divide diag_precond because precond is inv std
+        init_joint_log = target_log_potential(state)
+        @assert isfinite(init_joint_log) "SimpleRWMH can only be called on a configuration of positive density."
 
-    # Draw bounds for the log acceptance ratio
-    selector_params = draw_parameters(explorer.step_size_selector,rng)
+        # Draw bounds for the log acceptance ratio
+        selector_params = draw_parameters(explorer.step_size_selector,rng)
 
-    # compute the proposed step size
-    proposed_exponent =
-        auto_step_size(
-            target_log_potential,
-            diag_precond,
-            state, random_walk,
-            recorders, chain,
-            explorer.step_size, 
-            explorer.step_size_selector,
-            selector_params)
-    proposed_jitter = rand(rng, explorer.step_jitter_dist)
-    proposed_step_size = explorer.step_size * 2.0^(proposed_exponent+proposed_jitter)
-
-    # move to proposed point
-    random_walk_dynamics!(state, proposed_step_size, random_walk)
-    
-    if use_mh_accept_reject
-        # flip
-        random_walk .*= -one(eltype(random_walk))
-        reversed_exponent =
+        # compute the proposed step size
+        proposed_exponent =
             auto_step_size(
                 target_log_potential,
-                diag_precond,
                 state, random_walk,
                 recorders, chain,
                 explorer.step_size, 
                 explorer.step_size_selector,
                 selector_params)
-        final_joint_log = target_log_potential(state)
-        reversibility_passed = reversed_exponent == proposed_exponent
-        @record_if_requested!(recorders, :reversibility_rate, (chain, reversibility_passed))
-     
-        # compute the jitter z' needed to return to initial position
-        # due to the involutive nature of the flipped leapfrog, this occurs iff
-        #     eps0*2^(reversed_exponent+z') = eps0*2^(proposed_exponent+z)
-        # <=> z' = (proposed_exponent+z)-reversed_exponent
-        reversed_jitter = (proposed_exponent+proposed_jitter)-reversed_exponent
-        jitter_proposal_log_diff = logpdf(explorer.step_jitter_dist, proposed_jitter) - 
-            logpdf(explorer.step_jitter_dist, reversed_jitter)
-        @record_if_requested!(recorders, :explorer_proposal_log_diff, ( chain, jitter_proposal_log_diff ))
+        proposed_jitter = rand(rng, explorer.step_jitter_dist)
+        proposed_step_size = explorer.step_size * 2.0^(proposed_exponent+proposed_jitter)
+
+        # move to proposed point
+        random_walk_dynamics!(state, proposed_step_size, random_walk)
+        
+        if use_mh_accept_reject
+            # flip
+            random_walk .*= -one(eltype(random_walk))
+            reversed_exponent =
+                auto_step_size(
+                    target_log_potential,
+                    state, random_walk,
+                    recorders, chain,
+                    explorer.step_size, 
+                    explorer.step_size_selector,
+                    selector_params)
+            final_joint_log = target_log_potential(state)
+            reversibility_passed = reversed_exponent == proposed_exponent
+            @record_if_requested!(recorders, :reversibility_rate, (chain, reversibility_passed))
+        
+            # compute the jitter z' needed to return to initial position
+            # due to the involutive nature of the flipped leapfrog, this occurs iff
+            #     eps0*2^(reversed_exponent+z') = eps0*2^(proposed_exponent+z)
+            # <=> z' = (proposed_exponent+z)-reversed_exponent
+            reversed_jitter = (proposed_exponent+proposed_jitter)-reversed_exponent
+            jitter_proposal_log_diff = logpdf(explorer.step_jitter_dist, proposed_jitter) - 
+                logpdf(explorer.step_jitter_dist, reversed_jitter)
+            @record_if_requested!(recorders, :explorer_proposal_log_diff, ( chain, jitter_proposal_log_diff ))
 
 
-        # compute acceptance probability and MH decision
-        probability = if isfinite(jitter_proposal_log_diff)
-            min(
-                one(final_joint_log), 
-                exp(final_joint_log - init_joint_log - jitter_proposal_log_diff)
-            )
-        else
-            zero(final_joint_log)
-        end
-        @record_if_requested!(recorders, :explorer_acceptance_pr, (chain, probability))
-        if rand(rng) < probability
-            # accept: nothing to do, we work in-place
-        else
-            # reject: go back to start state
-            state .= start_state
+            # compute acceptance probability and MH decision
+            probability = if isfinite(jitter_proposal_log_diff)
+                min(
+                    one(final_joint_log), 
+                    exp(final_joint_log - init_joint_log - jitter_proposal_log_diff)
+                )
+            else
+                zero(final_joint_log)
+            end
+            @record_if_requested!(recorders, :explorer_acceptance_pr, (chain, probability))
+            if rand(rng) < probability
+                # accept: nothing to do, we work in-place
+            else
+                # reject: go back to start state
+                state .= start_state
+            end
         end
     end
 end
 
 function auto_step_size(
         target_log_potential,
-        diag_precond,
         state, random_walk,
         recorders, chain,
         step_size, 
@@ -182,7 +186,6 @@ function auto_step_size(
     log_joint_difference =
         log_joint_difference_function(
             target_log_potential,
-            diag_precond,
             state, random_walk,
             recorders)
     initial_difference = log_joint_difference(step_size)
@@ -237,7 +240,6 @@ end
 
 function log_joint_difference_function(
             target_log_potential,
-            diag_precond,
             state, random_walk,
             recorders)
 
@@ -274,53 +276,4 @@ function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
         push!(result, Pigeons._transformed_online) # for mass matrix adaptation
     end
     return result
-end
-
-###############################################################################
-# duplicated functions
-###############################################################################
-
-#=
-Functions duplicated from GradientBasedSampler.jl
-=#
-
-Pigeons.step!(explorer::SimpleRWMH, replica, shared) =
-    Pigeons.step!(explorer, replica, shared, replica.state)
-
-function Pigeons.step!(explorer::SimpleRWMH, replica, shared, state::AbstractVector)
-    log_potential = Pigeons.find_log_potential(replica, shared.tempering, shared)
-    _extract_commons_and_run!(explorer, replica, shared, log_potential, state)
-end
-
-#=
-Functions duplicated from PigeonsBridgeStanExt
-=#
-
-Pigeons.step!(explorer::SimpleRWMH, replica, shared, state::Pigeons.StanState) =
-    Pigeons.step!(explorer, replica, shared, state.unconstrained_parameters)
-
-#=
-Functions duplicated from PigeonsDynamicPPLExt
-=#
-
-function Pigeons.step!(explorer::SimpleRWMH, replica, shared, vi::DynamicPPL.TypedVarInfo)
-    vector_state = Pigeons.get_buffer(replica.recorders.buffers, :flattened_vi, get_dimension(vi))
-    flatten!(vi, vector_state) # in-place DynamicPPL.getall
-    Pigeons.step!(explorer, replica, shared, vector_state)
-    DynamicPPL.setall!(replica.state, vector_state)
-end
-
-get_dimension(vi::DynamicPPL.TypedVarInfo) = sum(meta -> sum(length, meta.ranges), vi.metadata)
-
-function flatten!(vi::DynamicPPL.TypedVarInfo, dest::Array)
-    i = firstindex(dest)
-    for meta in vi.metadata
-        vals = meta.vals
-        for r in meta.ranges
-            N = length(r)
-            copyto!(dest, i, vals, first(r), N)
-            i += N
-        end
-    end
-    return dest
 end

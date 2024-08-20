@@ -19,4 +19,9 @@ include("StepSizeSelector.jl")
 export SimpleRWMH
 include("SimpleRWMH.jl")
 
+export HitAndRunSlicer
+include("HitAndRunSlicer.jl")
+
+include("explorer_commons.jl")
+
 end # module autoRWMH
