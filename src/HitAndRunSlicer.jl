@@ -97,7 +97,7 @@ function ray_lp_function(
     proposed_state = get_buffer(buffers, :hrs_proposed_state, length(state))
     pointer = get_buffer(buffers, :hrs_pointer, 1) # works like a Ref (pointer[] === pointer[1]) but avoids re-allocating
     pointer[] = zero(eltype(pointer)) # to get correct initial state for the slicer, we need to start at 0
-    function ray_lp(::Any)::eltype(state) # the state we get passed is actually the initial state, so it is useless
+    function ray_lp(_)::eltype(state) # the state we get passed is actually the initial state, so it is useless
         hit_and_run_dynamics!(proposed_state, state, direction, pointer[])
         return target_log_potential(proposed_state)
     end

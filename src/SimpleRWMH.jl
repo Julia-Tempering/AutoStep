@@ -127,8 +127,12 @@ function auto_rwmh!(
 
         # move to proposed point
         random_walk_dynamics!(state, proposed_step_size, random_walk)
-        
-        if use_mh_accept_reject
+        final_joint_log = target_log_potential(state)
+
+        if !isfinite(final_joint_log) # check validity of new point (only relevant for nontrivial jitter)
+            state .= start_state      # reject: go back to start state
+            @record_if_requested!(recorders, :reversibility_rate, (chain, false))
+        elseif use_mh_accept_reject
             # flip
             random_walk .*= -one(eltype(random_walk))
             reversed_exponent =
@@ -139,7 +143,6 @@ function auto_rwmh!(
                     explorer.step_size, 
                     explorer.step_size_selector,
                     selector_params)
-            final_joint_log = target_log_potential(state)
             reversibility_passed = reversed_exponent == proposed_exponent
             @record_if_requested!(recorders, :reversibility_rate, (chain, reversibility_passed))
         

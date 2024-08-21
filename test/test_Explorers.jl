@@ -13,9 +13,9 @@
 
     @testset "SimpleRWMH" begin
         step_selectors = (autoRWMH.MHSelector(), autoRWMH.MHSelectorLegacy(), autoRWMH.MHSelectorInverted())
-        step_jitter_dists = (Dirac(0), Normal())
+        step_jitter_dists = (Dirac(0), Normal(0.0, 0.5))
         foreach(Iterators.product(step_selectors, step_jitter_dists)) do (sss, jdist)
-            explorer = SimpleRWMH(step_size_selector = sss, step_jitter_dist = jdist, n_refresh=2) # TODO: jittered version breaks down with n_refresh>2
+            explorer = SimpleRWMH(step_size_selector = sss, step_jitter_dist = jdist, n_refresh=50)
             @show explorer
             @test first(Pigeons.invariance_test(target, explorer, rng; condition_on=(:n_successes,)))
             @test first(Pigeons.invariance_test(toy_mvn_target(10), explorer, rng))
