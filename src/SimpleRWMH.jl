@@ -47,13 +47,23 @@ function Pigeons.adapt_explorer(explorer::SimpleRWMH, reduced_recorders, current
     estimated_target_std_deviations = adapt_preconditioner(explorer.preconditioner, reduced_recorders)
 
     # use the mean across chains of the mean shrink/grow factor to compute a new baseline stepsize
-    updated_step_size = explorer.step_size * mean(mean.(values(value(reduced_recorders.ar_factors))))
+    updated_step_size = explorer.step_size * mean(Pigeons.recorder_values(reduced_recorders.ar_factors))
+
+    # maybe adapt the jitter distribution based on observed average abs_exponent_diff
+    updated_jitter_dist = adapt_step_jitter_dist(explorer.step_jitter_dist, reduced_recorders.abs_exponent_diff)
 
     return SimpleRWMH(
         explorer.n_refresh, explorer.step_size_selector, updated_step_size,
-        explorer.step_jitter_dist,
-        explorer.preconditioner, estimated_target_std_deviations
+        updated_jitter_dist, explorer.preconditioner, estimated_target_std_deviations
     )
+end
+
+# jitter adaptation
+adapt_step_jitter_dist(d::UnivariateDistribution, _) = d
+function adapt_step_jitter_dist(d::Normal, abs_exponent_diff)
+    new_sd = 0.5 * mean(Pigeons.recorder_values(abs_exponent_diff))
+    # @info "Old jitter SD = $(round(d.σ, digits=4)) /// New jitter SD = $(round(new_sd, digits=4))"
+    Normal(mean(d), new_sd)
 end
 
 #=
@@ -132,6 +142,7 @@ function auto_rwmh!(
         if !isfinite(final_joint_log) # check validity of new point (only relevant for nontrivial jitter)
             state .= start_state      # reject: go back to start state
             @record_if_requested!(recorders, :reversibility_rate, (chain, false))
+            @record_if_requested!(recorders, :explorer_acceptance_pr, (chain, zero(final_joint_log)))
         elseif use_mh_accept_reject
             # flip
             random_walk .*= -one(eltype(random_walk))
@@ -145,7 +156,8 @@ function auto_rwmh!(
                     selector_params)
             reversibility_passed = reversed_exponent == proposed_exponent
             @record_if_requested!(recorders, :reversibility_rate, (chain, reversibility_passed))
-        
+            @record_if_requested!(recorders, :abs_exponent_diff, (chain, abs(proposed_exponent - reversed_exponent)))
+
             # compute the jitter z' needed to return to initial position
             # due to the involutive nature of the flipped leapfrog, this occurs iff
             #     eps0*2^(reversed_exponent+z') = eps0*2^(proposed_exponent+z)
@@ -153,8 +165,6 @@ function auto_rwmh!(
             reversed_jitter = (proposed_exponent+proposed_jitter)-reversed_exponent
             jitter_proposal_log_diff = logpdf(explorer.step_jitter_dist, proposed_jitter) - 
                 logpdf(explorer.step_jitter_dist, reversed_jitter)
-            @record_if_requested!(recorders, :explorer_proposal_log_diff, ( chain, jitter_proposal_log_diff ))
-
 
             # compute acceptance probability and MH decision
             probability = if isfinite(jitter_proposal_log_diff)
@@ -266,14 +276,16 @@ function log_joint_difference_function(
 end
 
 
-ar_factors() = Pigeons.am_factors()
+ar_factors() = Pigeons.am_factors() # same as GroupBy(Int, Mean()) but saves me directly importing OnlineStats
+abs_exponent_diff() = Pigeons.explorer_acceptance_pr() # same as GroupBy(Int, Mean()) but saves me directly importing OnlineStats
 
 function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
     result = [
         Pigeons.explorer_acceptance_pr,
         Pigeons.explorer_n_steps,
         ar_factors,
-        Pigeons.buffers
+        Pigeons.buffers,
+        abs_exponent_diff
     ]
     if explorer.preconditioner isa Pigeons.AdaptedDiagonalPreconditioner
         push!(result, Pigeons._transformed_online) # for mass matrix adaptation
