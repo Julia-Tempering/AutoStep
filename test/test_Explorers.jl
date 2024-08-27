@@ -13,9 +13,9 @@
 
     @testset "SimpleRWMH" begin
         step_selectors = (autoRWMH.MHSelector(), autoRWMH.MHSelectorLegacy(), autoRWMH.MHSelectorInverted())
-        step_jitter_dists = (Dirac(0), Normal(0.0, 0.5))
-        foreach(Iterators.product(step_selectors, step_jitter_dists)) do (sss, jdist)
-            explorer = SimpleRWMH(step_size_selector = sss, step_jitter_dist = jdist, n_refresh=50)
+        step_jitters = (autoRWMH.StepJitter(dist=Dirac(0)), autoRWMH.StepJitter(dist=Normal(0.0, 0.5)))
+        foreach(Iterators.product(step_selectors, step_jitters)) do (sss, sj)
+            explorer = SimpleRWMH(step_size_selector = sss, step_jitter = sj, n_refresh=50)
             @show explorer
             @test first(Pigeons.invariance_test(target, explorer, rng; condition_on=(:n_successes,)))
             @test first(Pigeons.invariance_test(toy_mvn_target(10), explorer, rng))
@@ -28,4 +28,16 @@
         @test first(Pigeons.invariance_test(target, explorer, rng; condition_on=(:n_successes,)))
         @test first(Pigeons.invariance_test(toy_mvn_target(10), explorer, rng))
     end
+end
+
+@testset "StepJitter" begin
+    t = Pigeons.stan_funnel()
+    explorer = SimpleRWMH()
+    init_σ = explorer.step_jitter.dist.σ
+    pt = pigeons(target = t, explorer = explorer, n_chains = 1)
+    @test !(pt.shared.explorer.step_jitter.dist.σ ≈ init_σ)
+
+    explorer = SimpleRWMH(step_jitter = autoRWMH.StepJitter(adapt_strategy=autoRWMH.FixedStepJitter()))
+    pt = pigeons(target = t, explorer = explorer, n_chains = 1)
+    @test pt.shared.explorer.step_jitter.dist.σ == init_σ
 end

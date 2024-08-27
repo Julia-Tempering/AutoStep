@@ -14,6 +14,7 @@ import Pigeons: adapt_preconditioner, Preconditioner, @record_if_requested!,
 
 include("vectorized_logpotentials.jl")
 include("StepSizeSelector.jl")
+include("StepJitter.jl")
 
 export SimpleRWMH
 include("SimpleRWMH.jl")

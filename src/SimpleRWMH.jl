@@ -7,7 +7,7 @@ and "inverted" step size selector.
 
 $FIELDS
 """
-@kwdef struct SimpleRWMH{T,TPrec <: Preconditioner,TSSS <: StepSizeSelector,TJitter <: UnivariateDistribution}
+@kwdef struct SimpleRWMH{T,TPrec <: Preconditioner,TSSS <: StepSizeSelector,TJitter <: StepJitter}
     """
     The number of steps (equivalently, direction refreshments) between swaps.
     """
@@ -25,10 +25,9 @@ $FIELDS
     step_size::Float64 = 1.0
 
     """
-    Distribution for drawing a random jitter (in log₂ space) of the deterministic
-    autoRWMH step size.
+    A [`StepJitter`](@ref) object controlling the step size jitter.
     """
-    step_jitter_dist::TJitter = Normal(0, 0.5)
+    step_jitter::TJitter = StepJitter()
 
     """
     A strategy for building a preconditioner.
@@ -50,20 +49,12 @@ function Pigeons.adapt_explorer(explorer::SimpleRWMH, reduced_recorders, current
     updated_step_size = explorer.step_size * mean(Pigeons.recorder_values(reduced_recorders.ar_factors))
 
     # maybe adapt the jitter distribution based on observed average abs_exponent_diff
-    updated_jitter_dist = adapt_step_jitter_dist(explorer.step_jitter_dist, reduced_recorders.abs_exponent_diff)
+    updated_step_jitter = adapt_step_jitter(explorer.step_jitter, reduced_recorders.abs_exponent_diff)
 
     return SimpleRWMH(
         explorer.n_refresh, explorer.step_size_selector, updated_step_size,
-        updated_jitter_dist, explorer.preconditioner, estimated_target_std_deviations
+        updated_step_jitter, explorer.preconditioner, estimated_target_std_deviations
     )
-end
-
-# jitter adaptation
-adapt_step_jitter_dist(d::UnivariateDistribution, _) = d
-function adapt_step_jitter_dist(d::Normal, abs_exponent_diff)
-    new_sd = 0.5 * mean(Pigeons.recorder_values(abs_exponent_diff))
-    # @info "Old jitter SD = $(round(d.σ, digits=4)) /// New jitter SD = $(round(new_sd, digits=4))"
-    Normal(mean(d), new_sd)
 end
 
 #=
@@ -132,7 +123,7 @@ function auto_rwmh!(
                 explorer.step_size, 
                 explorer.step_size_selector,
                 selector_params)
-        proposed_jitter = rand(rng, explorer.step_jitter_dist)
+        proposed_jitter = rand(rng, explorer.step_jitter.dist)
         proposed_step_size = explorer.step_size * 2.0^(proposed_exponent+proposed_jitter)
 
         # move to proposed point
@@ -163,8 +154,8 @@ function auto_rwmh!(
             #     eps0*2^(reversed_exponent+z') = eps0*2^(proposed_exponent+z)
             # <=> z' = (proposed_exponent+z)-reversed_exponent
             reversed_jitter = (proposed_exponent+proposed_jitter)-reversed_exponent
-            jitter_proposal_log_diff = logpdf(explorer.step_jitter_dist, proposed_jitter) - 
-                logpdf(explorer.step_jitter_dist, reversed_jitter)
+            jitter_proposal_log_diff = logpdf(explorer.step_jitter.dist, proposed_jitter) - 
+                logpdf(explorer.step_jitter.dist, reversed_jitter)
 
             # compute acceptance probability and MH decision
             probability = if isfinite(jitter_proposal_log_diff)
