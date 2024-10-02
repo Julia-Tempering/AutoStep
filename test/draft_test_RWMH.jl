@@ -6,6 +6,7 @@ using Distributions
 using Statistics
 using DataFrames
 using CSV
+using StatsPlots
 
 function string_to_model(model) 
     if model == "logearn_height" # dim = 3
@@ -47,26 +48,28 @@ end
 
 function main()
     # simulation settings
-    seeds = [1,2,3,4,5,6,7,8,9,10]
-    models = ["earn_height"] #[MyLogPotential(3,2)]
-    explorers = ["autoRWMH", "soft_autoRWMH", "autoRWMH_inverted", "soft_autoRWMH_inverted", 
-        "slice", "autoMALA"]
-    n_rounds = 10
-    n_chains = 1 #?????
+    seeds = [1]#,2,3,4,5,6,7,8,9,10]
+    models = ["eight_schools_centered"]
+    explorers = ["slice"]#["autoRWMH", "soft_autoRWMH", "autoRWMH_inverted", "soft_autoRWMH_inverted", "slice", "autoMALA"]
+    n_rounds = 15
+    n_chains = 10 #?????
     result = DataFrame(explorer = String[], model = String[], minESS = Float64[],
         minESSperSec = Float64[])
 
     # simulation
     for model in models
-        for seed in seeds 
-            for explorer in explorers
+        for explorer in explorers 
+            for seed in seeds
                 pt = pigeons(
                     target = string_to_model(model),
                     # reference = model,
                     seed = seed, 
                     explorer = string_to_explorer(explorer),
-                    record = [traces; record_default()],
-                    n_rounds = n_rounds)
+                    record = [traces; record_default(); round_trip],
+                    n_rounds = n_rounds,
+                    n_chains = n_chains)
+                print(pt.shared.reports.summary)
+                display(StatsPlots.plot(Chains(pt)))
                 ess_df = MCMCChains.ess(Chains(pt))
                 time = sum(pt.shared.reports.summary.last_round_max_time)
                 push!(result, (explorer, model, minimum(ess_df.nt.ess),
@@ -76,7 +79,7 @@ function main()
     end
     # Remove rows with any NaNs
     # clean_results_ESS = filter(row->!(isnan(row.minESS)), result)
-    CSV.write("results/InferHub/earn_height_ess.csv", result)
+    CSV.write("results/InferHub/eight_schools_ess.csv", result)
 end 
 
 main()

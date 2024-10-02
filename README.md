@@ -12,10 +12,3 @@ pigeons(
     explorer = SimpleRWMH()
 )
 ```
-
-## Notes for Ivy: TODO
-1. expected jump distance using doeblin condition
-2. debug: why acceptance probability always equals to 1?
-2. simulations using InferHub, InferHub-infra (with nextflow)
-3. Intro: RWMH is useful because of non-differentiable potentials()
-4. bibtex + comments

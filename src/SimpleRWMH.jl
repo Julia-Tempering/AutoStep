@@ -129,6 +129,7 @@ function auto_rwmh!(
         # move to proposed point
         random_walk_dynamics!(state, proposed_step_size, random_walk)
         final_joint_log = target_log_potential(state)
+        @record_if_requested!(recorders, :explorer_n_logprob, (chain, 2)) # twice: final and init joint log
 
         if !isfinite(final_joint_log) # check validity of new point (only relevant for nontrivial jitter)
             state .= start_state      # reject: go back to start state
@@ -203,6 +204,7 @@ function auto_step_size(
             0, 0
         end
     @record_if_requested!(recorders, :explorer_n_steps, (chain, 1+n_steps))
+    @record_if_requested!(recorders, :explorer_n_logprob, (chain, 2*(1+n_steps))) # every log_joint_difference call logprob twice
     @record_if_requested!(recorders, :ar_factors, (chain, 2.0^exponent))
     return exponent
 end
@@ -269,6 +271,7 @@ end
 
 ar_factors() = Pigeons.am_factors() # same as GroupBy(Int, Mean()) but saves me directly importing OnlineStats
 abs_exponent_diff() = Pigeons.explorer_acceptance_pr() # same as GroupBy(Int, Mean()) but saves me directly importing OnlineStats
+explorer_n_logprob() = Pigeons.explorer_n_steps() # reuse additive recorder
 
 function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
     result = [
@@ -276,7 +279,8 @@ function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
         Pigeons.explorer_n_steps,
         ar_factors,
         Pigeons.buffers,
-        abs_exponent_diff
+        abs_exponent_diff,
+        explorer_n_logprob
     ]
     if explorer.preconditioner isa Pigeons.AdaptedDiagonalPreconditioner
         push!(result, Pigeons._transformed_online) # for mass matrix adaptation
