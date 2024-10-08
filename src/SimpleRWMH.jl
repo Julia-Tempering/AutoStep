@@ -168,6 +168,7 @@ function auto_rwmh!(
                 zero(final_joint_log)
             end
             @record_if_requested!(recorders, :explorer_acceptance_pr, (chain, probability))
+            @record_if_requested!(recorders, :energy_jump_distance, (chain, abs(final_joint_log - init_joint_log)))
             if rand(rng) < probability
                 # accept: nothing to do, we work in-place
             else
@@ -188,11 +189,12 @@ function auto_step_size(
 
     @assert step_size > 0
 
+    h_before = target_log_potential(state)
     log_joint_difference =
         log_joint_difference_function(
             target_log_potential,
             state, random_walk,
-            recorders)
+            recorders, h_before)
     initial_difference = log_joint_difference(step_size)
 
     n_steps, exponent =
@@ -203,7 +205,7 @@ function auto_step_size(
         else
             0, 0
         end
-    @record_if_requested!(recorders, :explorer_n_steps, (chain, 2*(1+n_steps))) # every log_joint_difference call logprob twice
+    @record_if_requested!(recorders, :explorer_n_steps, (chain, 1+n_steps)) # every log_joint_difference call logprob once
     @record_if_requested!(recorders, :ar_factors, (chain, 2.0^exponent))
     return exponent
 end
@@ -246,7 +248,7 @@ end
 function log_joint_difference_function(
             target_log_potential,
             state, random_walk,
-            recorders)
+            recorders, h_before)
 
     dim = length(state)
 
@@ -256,7 +258,6 @@ function log_joint_difference_function(
     random_walk_before = get_buffer(recorders.buffers, :ar_ljdf_random_walk_before_buffer, dim)
     random_walk_before .= random_walk
 
-    h_before = target_log_potential(state)
     function result(step_size)
         random_walk_dynamics!(state, step_size, random_walk)
         h_after = target_log_potential(state)
@@ -270,6 +271,7 @@ end
 
 ar_factors() = Pigeons.am_factors() # same as GroupBy(Int, Mean()) but saves me directly importing OnlineStats
 abs_exponent_diff() = Pigeons.explorer_acceptance_pr() # same as GroupBy(Int, Mean()) but saves me directly importing OnlineStats
+energy_jump_distance() = Pigeons.explorer_acceptance_pr()
 
 function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
     result = [
@@ -277,7 +279,8 @@ function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
         Pigeons.explorer_n_steps,
         ar_factors,
         Pigeons.buffers,
-        abs_exponent_diff
+        abs_exponent_diff,
+        energy_jump_distance
     ]
     if explorer.preconditioner isa Pigeons.AdaptedDiagonalPreconditioner
         push!(result, Pigeons._transformed_online) # for mass matrix adaptation
