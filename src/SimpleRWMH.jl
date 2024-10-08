@@ -169,6 +169,7 @@ function auto_rwmh!(
             end
             @record_if_requested!(recorders, :explorer_acceptance_pr, (chain, probability))
             @record_if_requested!(recorders, :energy_jump_distance, (chain, abs(final_joint_log - init_joint_log)))
+            @record_if_requested!(recorders, :jitter_proposal_log_diff, (chain, jitter_proposal_log_diff))
             if rand(rng) < probability
                 # accept: nothing to do, we work in-place
             else
@@ -272,6 +273,7 @@ end
 ar_factors() = Pigeons.am_factors() # same as GroupBy(Int, Mean()) but saves me directly importing OnlineStats
 abs_exponent_diff() = Pigeons.explorer_acceptance_pr() # same as GroupBy(Int, Mean()) but saves me directly importing OnlineStats
 energy_jump_distance() = Pigeons.explorer_acceptance_pr()
+jitter_proposal_log_diff() = Pigeons.explorer_acceptance_pr()
 
 function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
     result = [
@@ -280,7 +282,8 @@ function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
         ar_factors,
         Pigeons.buffers,
         abs_exponent_diff,
-        energy_jump_distance
+        energy_jump_distance,
+        jitter_proposal_log_diff
     ]
     if explorer.preconditioner isa Pigeons.AdaptedDiagonalPreconditioner
         push!(result, Pigeons._transformed_online) # for mass matrix adaptation
