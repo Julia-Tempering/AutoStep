@@ -36,3 +36,13 @@ should_grow(::MHSelectorInverted, bounds, log_diff) =
     abs(log_diff) + last(bounds) < zero(log_diff) # |logR| < -log b
 should_shrink(::MHSelectorInverted, bounds, log_diff) = 
     !isfinite(log_diff) || abs(log_diff) + first(bounds) > zero(log_diff) # |logR| > -log a
+
+"""
+$SIGNATURES
+
+step size selector that does not automatically select step size
+"""
+struct MHNonAdaptiveSelector <: StepSizeSelector end
+
+should_grow(::MHNonAdaptiveSelector, bounds, log_diff) = false
+should_shrink(::MHNonAdaptiveSelector, bounds, log_diff) = false
