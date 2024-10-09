@@ -86,7 +86,7 @@ function hit_and_run!(
         step = pointer[]
         iszero(step) || hit_and_run_dynamics!(state, state, direction, step)
     end
-    @record_if_requested!(replica.recorders, :slicer_energy_jump_distance, (replica.chain, abs(cached_lp_init - cached_lp)))
+    @record_if_requested!(replica.recorders, :energy_jump_distance, (replica.chain, abs(cached_lp_init - cached_lp)))
 end
 
 function ray_lp_function(
@@ -109,11 +109,9 @@ function hit_and_run_dynamics!(proposed_state, state, direction, step)
     @. proposed_state = state + step * direction
 end
 
-slicer_energy_jump_distance() = Pigeons.explorer_acceptance_pr()
-
 function Pigeons.explorer_recorder_builders(explorer::HitAndRunSlicer)
     result = Pigeons.explorer_recorder_builders(explorer.slicer)
-    push!(result, slicer_energy_jump_distance)
+    push!(result, energy_jump_distance)
     push!(result, Pigeons.buffers)
     if explorer.preconditioner isa Pigeons.AdaptedDiagonalPreconditioner
         push!(result, Pigeons._transformed_online) # for mass matrix adaptation
