@@ -42,8 +42,9 @@ $FIELDS
 end
 
 function Pigeons.adapt_explorer(explorer::SimpleRWMH, reduced_recorders, current_pt, new_tempering)
-    # re-estimate std devs under the target
-    estimated_target_std_deviations = adapt_preconditioner(explorer.preconditioner, reduced_recorders)
+    # re-estimate std devs under the target; no adaption for RWMH, keep hand tuning param
+    estimated_target_std_deviations = explorer.step_size_selector isa MHNonAdaptiveSelector ?
+    explorer.estimated_target_std_deviations : adapt_preconditioner(explorer.preconditioner, reduced_recorders)
 
     # use the mean across chains of the mean shrink/grow factor to compute a new baseline stepsize
     updated_step_size = explorer.step_size * mean(Pigeons.recorder_values(reduced_recorders.ar_factors))
