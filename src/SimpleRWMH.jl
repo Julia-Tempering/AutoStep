@@ -178,7 +178,7 @@ function auto_rwmh!(
                 state .= start_state
             end
         end
-        final_joint_Log = target_log_potential(state)
+        final_joint_log = target_log_potential(state)
         @record_if_requested!(recorders, :energy_jump_distance, (chain, abs(final_joint_log - init_joint_log)))
     end
 end
