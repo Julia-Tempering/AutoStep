@@ -78,7 +78,8 @@ function _extract_commons_and_run!(explorer::SimpleRWMH, replica, shared, log_po
         # We only do this on the first scan of each round.
         # Since the number of iterations per round increases,
         # the fraction of time we do this decreases to zero.
-        !is_first_scan_of_round
+        # !is_first_scan_of_round
+        true
     )
 end
 
@@ -169,7 +170,6 @@ function auto_rwmh!(
                 zero(final_joint_log)
             end
             @record_if_requested!(recorders, :explorer_acceptance_pr, (chain, probability))
-            @record_if_requested!(recorders, :energy_jump_distance, (chain, abs(final_joint_log - init_joint_log)))
             @record_if_requested!(recorders, :jitter_proposal_log_diff, (chain, jitter_proposal_log_diff))
             if rand(rng) < probability
                 # accept: nothing to do, we work in-place
@@ -178,6 +178,8 @@ function auto_rwmh!(
                 state .= start_state
             end
         end
+        final_joint_Log = target_log_potential(state)
+        @record_if_requested!(recorders, :energy_jump_distance, (chain, abs(final_joint_log - init_joint_log)))
     end
 end
 
