@@ -10,16 +10,16 @@ $SIGNATURES
 
 autoMALA-style step size selector.
 """
-struct MHSelector <: StepSizeSelector end
+struct ASSelector <: StepSizeSelector end
 
 """
 $SIGNATURES
 
 autoMALA-style step size selector with the original endpoint sampling procedure.
 """
-struct MHSelectorLegacy <: StepSizeSelector end
+struct ASSelectorLegacy <: StepSizeSelector end
 
-function draw_parameters(::MHSelectorLegacy, rng::AbstractRNG)
+function draw_parameters(::ASSelectorLegacy, rng::AbstractRNG)
     a = rand(rng)
     b = rand(rng)
     log(min(a, b)), log(max(a, b))
@@ -30,11 +30,11 @@ $SIGNATURES
 
 autoMALA-style step size selector with symmetric acceptance region.
 """
-struct MHSelectorInverted <: StepSizeSelector end
+struct ASSelectorInverted <: StepSizeSelector end
 
-should_grow(::MHSelectorInverted, bounds, log_diff) = 
+should_grow(::ASSelectorInverted, bounds, log_diff) = 
     abs(log_diff) + last(bounds) < zero(log_diff) # |logR| < -log b
-should_shrink(::MHSelectorInverted, bounds, log_diff) = 
+should_shrink(::ASSelectorInverted, bounds, log_diff) = 
     !isfinite(log_diff) || abs(log_diff) + first(bounds) > zero(log_diff) # |logR| > -log a
 
 """
@@ -42,7 +42,7 @@ $SIGNATURES
 
 step size selector that does not automatically select step size
 """
-struct MHNonAdaptiveSelector <: StepSizeSelector end
+struct ASNonAdaptiveSelector <: StepSizeSelector end
 
-should_grow(::MHNonAdaptiveSelector, bounds, log_diff) = false
-should_shrink(::MHNonAdaptiveSelector, bounds, log_diff) = false
+should_grow(::ASNonAdaptiveSelector, bounds, log_diff) = false
+should_shrink(::ASNonAdaptiveSelector, bounds, log_diff) = false

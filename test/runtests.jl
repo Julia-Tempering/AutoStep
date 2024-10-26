@@ -4,7 +4,7 @@ include("supporting/setup.jl")
 test_dir = @__DIR__ 
 @assert basename(test_dir) == "test"
 project_root_dir = dirname(test_dir)
-@assert pathof(autoRWMH) == joinpath(project_root_dir, "src", "autoRWMH.jl") 
+@assert pathof(AutoStep) == joinpath(project_root_dir, "src", "AutoStep.jl") 
 
 # load all files starting with "test_"
 for test_name in Iterators.filter(x -> startswith(x, "test_") && endswith(x, ".jl"), readdir(test_dir))

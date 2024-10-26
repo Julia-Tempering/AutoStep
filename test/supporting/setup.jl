@@ -2,10 +2,11 @@
 using Pkg
 Pkg.add(name="Pigeons", rev="main")
 
-using autoRWMH
+using AutoStep
 using BridgeStan
 using Distributions
 using DynamicPPL
+using ForwardDiff
 using HypothesisTests
 using Pigeons
 using Random

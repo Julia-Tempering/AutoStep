@@ -1,6 +1,6 @@
-name = "autoRWMH"
+name = "AutoStep"
 uuid = "9c7125eb-1c93-4483-8569-ec7e9755e655"
-authors = ["tgliu0406 <tiangeliu0528@gmail.com>"]
+authors = ["Tiange Liu <tiangeliu0528@gmail.com>, Alexandre Bouchard-Côté <bouchard@stat.ubc.ca>, Nikola Surjanovic <nikola.surjanovic@stat.ubc.ca>, Paul Tiede <ptiede91@gmail.com>, Trevor Campbell, Miguel Biron-Lattes, Saifuddin Syed"]
 version = "0.1.0"
 
 [deps]

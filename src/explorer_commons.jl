@@ -1,4 +1,4 @@
-const Explorers = Union{SimpleRWMH, HitAndRunSlicer}
+const Explorers = Union{SimpleRWMH, HitAndRunSlicer, SimpleAHMC}
 
 Pigeons.step!(explorer::Explorers, replica, shared) =
     Pigeons.step!(explorer, replica, shared, replica.state)
@@ -40,3 +40,47 @@ function flatten!(vi::DynamicPPL.TypedVarInfo, dest::Array)
     end
     return dest
 end
+
+
+#=
+step size dynamics that is common to autoRWMH and autoHMC
+=#
+function grow_step_size(log_joint_difference, step_size, selector, selector_params)
+    n = 1
+    while true
+        step_size *= 2.0
+        diff = log_joint_difference(step_size)
+        if !isfinite(diff) || !should_grow(selector, selector_params, diff)
+            return n, n - 1 # one less step, to avoid a potential cliff-like drop in acceptance
+        end
+        n += 1
+    end
+end
+
+function shrink_step_size(log_joint_difference, step_size, selector, selector_params)
+    n = 1
+    while true
+        step_size /= 2.0
+        diff = log_joint_difference(step_size)
+        #=
+        Note that shrink is a bit different than grow.
+        We do not assume here that the diff is necessarily
+        finite when we start this loop: indeed, when the step
+        size is too big, we may have to shrink several times
+        until we get to a scale giving a finite evaluation.
+        =#
+        if step_size == 0.0
+            error("Could not find an acceptable positive step size (selector_params: $selector_params")
+        end
+        if !should_shrink(selector, selector_params, diff)
+            return n, -n
+        end
+        n += 1
+    end
+end
+
+# all are GroupBy(Int, Mean()) but saves me directly importing OnlineStats
+as_factors() = Pigeons.am_factors()
+abs_exponent_diff() = Pigeons.explorer_acceptance_pr()
+energy_jump_distance() = Pigeons.explorer_acceptance_pr()
+jitter_proposal_log_diff() = Pigeons.explorer_acceptance_pr()

@@ -1,23 +1,39 @@
-## TODO: geometric mix of preconditioner; unadjusted move until pass the reverse-check
 """
 $SIGNATURES
 
-A generalization of autoMALA towards autoRWMH， with soft reversibility check 
-and "inverted" step size selector.
+A simple generalization of autoMALA towards autoHMC, where the number of
+leapfrog steps is sampled independently of everything else. The autoMALA 
+step-size selection procedure is then applied to HMC with the above number 
+of leapfrog steps fixed.
 
 $FIELDS
 """
-@kwdef struct SimpleRWMH{T,TPrec <: Preconditioner,TSSS <: StepSizeSelector,TJitter <: StepJitter}
+@kwdef struct SimpleAHMC{T,TPrec <: Preconditioner,TIntTime <: IntegrationTime,TSSS <: StepSizeSelector,TJitter <: StepJitter}
     """
-    The number of steps (equivalently, direction refreshments) between swaps.
+    An [`IntegrationTime`](@ref) specifying how to determine the number of leapfrog
+    steps to carry out at each iteration.
     """
-    n_refresh::Int = 1
-
+    int_time::TIntTime = AdaptiveRandomIntegrationTime()
+  
     """
     A [`StepSizeSelector`](@ref) controlling the strategy for selecting the step size at each iteration.
     """
     step_size_selector::TSSS = ASSelectorInverted()
   
+    """
+    The number of steps (equivalently, momentum refreshments) between swaps.
+    """
+    n_refresh::Int = 1
+
+    """
+    The default backend to use for autodiff.
+    See https://github.com/tpapp/LogDensityProblemsAD.jl#backends
+
+    Certain targets may ignore it, e.g. if a manual differential is
+    offered or when calling an external program such as Stan.
+    """
+    default_autodiff_backend::Symbol = :ForwardDiff
+
     """
     Starting point for the automatic step size algorithm.
     Gets updated automatically between each round.
@@ -39,20 +55,27 @@ $FIELDS
     which case an identity mass matrix is used.
     """
     estimated_target_std_deviations::T = nothing
+
+    # TODO: add option(s) for transformations? For now, doing it only for Turing
 end
 
-function Pigeons.adapt_explorer(explorer::SimpleRWMH, reduced_recorders, current_pt, new_tempering)
-    # re-estimate std devs under the target; no adaption for RWMH, keep hand tuning param
+function Pigeons.adapt_explorer(explorer::SimpleAHMC, reduced_recorders, current_pt, new_tempering)
+    # re-estimate std devs under the target; no adaptation for HMC/ MALA
     estimated_target_std_deviations = adapt_preconditioner(explorer.preconditioner, reduced_recorders)
 
     # use the mean across chains of the mean shrink/grow factor to compute a new baseline stepsize
     updated_step_size = explorer.step_size * mean(Pigeons.recorder_values(reduced_recorders.as_factors))
 
+    # update integration time
+    new_int_time = adapt_integration_time(
+        explorer.int_time, reduced_recorders, current_pt, updated_step_size)
+
     # maybe adapt the jitter distribution based on observed average abs_exponent_diff
     updated_step_jitter = adapt_step_jitter(explorer.step_jitter, reduced_recorders.abs_exponent_diff)
 
-    return SimpleRWMH(
-        explorer.n_refresh, explorer.step_size_selector, updated_step_size,
+    return SimpleAHMC(
+        new_int_time, explorer.step_size_selector,
+        explorer.n_refresh, explorer.default_autodiff_backend, updated_step_size,
         updated_step_jitter, explorer.preconditioner, estimated_target_std_deviations
     )
 end
@@ -60,13 +83,14 @@ end
 #=
 Extract info common to all types of target and perform a step!()
 =#
-function _extract_commons_and_run!(explorer::SimpleRWMH, replica, shared, log_potential, state::AbstractVector)
-    vec_log_potential = vectorize(log_potential, replica)
+function _extract_commons_and_run!(explorer::SimpleAHMC, replica, shared, log_potential, state::AbstractVector)
 
-    auto_rwmh!(
+    log_potential_autodiff = ADgradient(explorer.default_autodiff_backend, log_potential, replica)
+
+    auto_hmc!(
         replica.rng,
         explorer,
-        vec_log_potential,
+        log_potential_autodiff,
         state,
         replica.recorders,
         replica.chain,
@@ -75,15 +99,9 @@ function _extract_commons_and_run!(explorer::SimpleRWMH, replica, shared, log_po
     )
 end
 
-# we add tricks to make it non-allocating
-function random_walk_dynamics!(state, step_size, random_walk)
-    state .+= step_size .* random_walk
-    return true
-end
-
-function auto_rwmh!(
+function auto_hmc!(
         rng::AbstractRNG,
-        explorer::SimpleRWMH,
+        explorer::SimpleAHMC,
         target_log_potential,
         state::Vector,
         recorders,
@@ -92,54 +110,65 @@ function auto_rwmh!(
 
     dim = length(state)
 
-    diag_precond = get_buffer(recorders.buffers, :ar_diag_precond, dim)
+    momentum = get_buffer(recorders.buffers, :ah_momentum_buffer, dim)
+    diag_precond = get_buffer(recorders.buffers, :ah_diag_precond, dim)
     build_preconditioner!(diag_precond, explorer.preconditioner, rng, explorer.estimated_target_std_deviations)
-    start_state = get_buffer(recorders.buffers, :ar_state_buffer, dim)
-    random_walk = get_buffer(recorders.buffers, :ar_walk_buffer, dim)
+    start_state = get_buffer(recorders.buffers, :ah_state_buffer, dim)
     
-    for _ in 1:explorer.n_refresh
+    for i in 1:explorer.n_refresh
+        # get a (possibly randomized) number of leapfrog steps from the IntegrationTime object
+        n_leaps = get_n_leaps(explorer.int_time, rng, dim)
+
         # build augmented state
         start_state .= state
-        randn!(rng, random_walk)
-        random_walk .= random_walk ./ diag_precond # divide diag_precond because precond is inv std
-        init_joint_log = target_log_potential(state)
-        @assert isfinite(init_joint_log) "SimpleRWMH can only be called on a configuration of positive density."
+        randn!(rng, momentum)
+        init_joint_log = log_joint(target_log_potential, state, momentum)
+        @assert isfinite(init_joint_log) "SimpleAHMC can only be called on a configuration of positive density."
 
         # Draw bounds for the log acceptance ratio
         selector_params = draw_parameters(explorer.step_size_selector,rng)
 
         # compute the proposed step size
         proposed_exponent =
-            auto_rwmh_step_size(
+            auto_hmc_step_size(
                 target_log_potential,
-                state, random_walk,
+                diag_precond,
+                state, momentum,
                 recorders, chain,
                 explorer.step_size, 
                 explorer.step_size_selector,
-                selector_params)
+                selector_params, n_leaps)
         proposed_jitter = rand(rng, explorer.step_jitter.dist)
         proposed_step_size = explorer.step_size * 2.0^(proposed_exponent+proposed_jitter)
 
         # move to proposed point
-        random_walk_dynamics!(state, proposed_step_size, random_walk)
-        final_joint_log = target_log_potential(state)
-        @record_if_requested!(recorders, :explorer_n_steps, (chain, 2)) # two logprob evaluations: final and init
+        hamiltonian_dynamics!(
+            target_log_potential,
+            diag_precond,
+            state, momentum, proposed_step_size,
+            n_leaps
+        )
+        final_joint_log = log_joint(target_log_potential, state, momentum)
+        @record_if_requested!(recorders, :explorer_n_logprob, (chain, 4)) # two logprob eval: init_joint_log and final_joint_log
+                                                                        # two more: one hamiltonian dynamics requires 2 logprob eval
 
         if !isfinite(final_joint_log) # check validity of new point (only relevant for nontrivial jitter)
             state .= start_state      # reject: go back to start state
             @record_if_requested!(recorders, :reversibility_rate, (chain, false))
             @record_if_requested!(recorders, :explorer_acceptance_pr, (chain, zero(final_joint_log)))
+            @record_if_requested!(recorders, :energy_jump_distance, (chain, 0))
         elseif use_mh_accept_reject
             # flip
-            random_walk .*= -one(eltype(random_walk))
+            momentum .*= -one(eltype(momentum))
             reversed_exponent =
-                auto_rwmh_step_size(
+                auto_hmc_step_size(
                     target_log_potential,
-                    state, random_walk,
+                    diag_precond,
+                    state, momentum,
                     recorders, chain,
                     explorer.step_size, 
                     explorer.step_size_selector,
-                    selector_params)
+                    selector_params, n_leaps)
             reversibility_passed = reversed_exponent == proposed_exponent
             @record_if_requested!(recorders, :reversibility_rate, (chain, reversibility_passed))
             @record_if_requested!(recorders, :abs_exponent_diff, (chain, abs(proposed_exponent - reversed_exponent)))
@@ -161,36 +190,41 @@ function auto_rwmh!(
             else
                 zero(final_joint_log)
             end
+
             @record_if_requested!(recorders, :explorer_acceptance_pr, (chain, probability))
+            
             @record_if_requested!(recorders, :jitter_proposal_log_diff, (chain, jitter_proposal_log_diff))
             if rand(rng) < probability
                 # accept: nothing to do, we work in-place
+                @record_if_requested!(recorders, :energy_jump_distance, (chain, abs(final_joint_log - init_joint_log)))
             else
                 # reject: go back to start state
                 state .= start_state
+                # no need to reset momentum as it will get resampled at beginning of the loop
+                @record_if_requested!(recorders, :energy_jump_distance, (chain, 0))
             end
         end
-        final_joint_log = target_log_potential(state)
-        @record_if_requested!(recorders, :energy_jump_distance, (chain, abs(final_joint_log - init_joint_log)))
     end
 end
 
-function auto_rwmh_step_size(
+function auto_hmc_step_size(
         target_log_potential,
-        state, random_walk,
+        diag_precond,
+        state, momentum,
         recorders, chain,
         step_size, 
         selector, 
-        selector_params) # should be the exact same in fwd and bwd pass!
+        selector_params, # should be the exact same in fwd and bwd pass!
+        n_leaps)
 
     @assert step_size > 0
 
-    h_before = target_log_potential(state)
     log_joint_difference =
-        rwmh_log_joint_difference_function(
+        hmc_log_joint_difference_function(
             target_log_potential,
-            state, random_walk,
-            recorders, h_before)
+            diag_precond,
+            state, momentum,
+            recorders, n_leaps)
     initial_difference = log_joint_difference(step_size)
 
     n_steps, exponent =
@@ -201,30 +235,37 @@ function auto_rwmh_step_size(
         else
             0, 0
         end
-    @record_if_requested!(recorders, :explorer_n_steps, (chain, 1+n_steps)) # every log_joint_difference call logprob once
+
+    @record_if_requested!(recorders, :explorer_n_steps, (chain, 1+n_steps*n_leaps)) # we do n_leaps leapfrogs per each grow/shrink step
+    @record_if_requested!(recorders, :explorer_n_logprob, (chain, (1+n_steps)*(3+n_leaps))) # log_joint_diff computes logprob 3+n_leaps times
     @record_if_requested!(recorders, :as_factors, (chain, 2.0^exponent))
     return exponent
 end
 
 
-function rwmh_log_joint_difference_function(
+function hmc_log_joint_difference_function(
             target_log_potential,
-            state, random_walk,
-            recorders, h_before)
+            diag_precond,
+            state, momentum,
+            recorders,
+            n_leaps)
 
     dim = length(state)
 
     state_before = get_buffer(recorders.buffers, :as_ljdf_state_before_buffer, dim)
     state_before .= state
 
-    random_walk_before = get_buffer(recorders.buffers, :as_ljdf_random_walk_before_buffer, dim)
-    random_walk_before .= random_walk
+    momentum_before = get_buffer(recorders.buffers, :as_ljdf_momentum_before_buffer, dim)
+    momentum_before .= momentum
 
+    h_before = log_joint(target_log_potential, state, momentum)
     function result(step_size)
-        random_walk_dynamics!(state, step_size, random_walk)
-        h_after = target_log_potential(state)
+        hamiltonian_dynamics!(
+            target_log_potential, diag_precond,
+            state, momentum, step_size, n_leaps)
+        h_after = log_joint(target_log_potential, state, momentum)
         state .= state_before
-        random_walk .= random_walk_before
+        momentum .= momentum_before
         return h_after - h_before
     end
     return result
@@ -232,18 +273,31 @@ end
 
 
 
-function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
+explorer_n_logprob() = Pigeons.explorer_n_steps() # reuse additive recorder
+
+function Pigeons.explorer_recorder_builders(explorer::SimpleAHMC)
     result = [
         Pigeons.explorer_acceptance_pr,
         Pigeons.explorer_n_steps,
         as_factors,
-        Pigeons.buffers,
         abs_exponent_diff,
+        explorer_n_logprob,
         energy_jump_distance,
         jitter_proposal_log_diff
     ]
-    if explorer.preconditioner isa Pigeons.AdaptedDiagonalPreconditioner
-        push!(result, Pigeons._transformed_online) # for mass matrix adaptation
-    end
+    gradient_based_sampler_recorders!(result, explorer)
+    add_int_time_recorder!(result, explorer.int_time)
     return result
+end
+
+#=
+Functions duplicated from GradientBasedSampler.jl
+=#
+
+function gradient_based_sampler_recorders!(recorders, explorer::SimpleAHMC)
+    push!(recorders, Pigeons.buffers)
+    push!(recorders, Pigeons.ad_buffers)
+    if hasproperty(explorer, :preconditioner) && explorer.preconditioner isa Pigeons.AdaptedDiagonalPreconditioner
+        push!(recorders, Pigeons._transformed_online) # for mass matrix adaptation
+    end
 end

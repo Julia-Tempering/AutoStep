@@ -1,6 +1,6 @@
 using Pigeons
 using BridgeStan
-using autoRWMH
+using AutoStep
 using MCMCChains
 using Distributions
 using Statistics
