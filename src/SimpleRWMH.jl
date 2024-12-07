@@ -117,6 +117,7 @@ function auto_rwmh!(
                 explorer.step_size, 
                 explorer.step_size_selector,
                 selector_params)
+        @record_if_requested!(recorders, :num_doubling, (chain, abs(proposed_exponent))) #record number of doublings/halvings
         proposed_jitter = rand(rng, explorer.step_jitter.dist)
         proposed_step_size = explorer.step_size * 2.0^(proposed_exponent+proposed_jitter)
 
@@ -240,7 +241,8 @@ function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
         Pigeons.buffers,
         abs_exponent_diff,
         energy_jump_distance,
-        jitter_proposal_log_diff
+        jitter_proposal_log_diff,
+        num_doubling
     ]
     if explorer.preconditioner isa Pigeons.AdaptedDiagonalPreconditioner
         push!(result, Pigeons._transformed_online) # for mass matrix adaptation

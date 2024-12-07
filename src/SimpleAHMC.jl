@@ -140,6 +140,7 @@ function auto_hmc!(
                 selector_params, n_leaps)
         proposed_jitter = rand(rng, explorer.step_jitter.dist)
         proposed_step_size = explorer.step_size * 2.0^(proposed_exponent+proposed_jitter)
+        @record_if_requested!(recorders, :num_doubling, (chain, abs(proposed_exponent)))
 
         # move to proposed point
         hamiltonian_dynamics!(
@@ -283,7 +284,8 @@ function Pigeons.explorer_recorder_builders(explorer::SimpleAHMC)
         abs_exponent_diff,
         explorer_n_logprob,
         energy_jump_distance,
-        jitter_proposal_log_diff
+        jitter_proposal_log_diff,
+        num_doubling
     ]
     gradient_based_sampler_recorders!(result, explorer)
     add_int_time_recorder!(result, explorer.int_time)
