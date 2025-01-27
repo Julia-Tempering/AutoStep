@@ -45,8 +45,9 @@ function Pigeons.adapt_explorer(explorer::SimpleRWMH, reduced_recorders, current
     # re-estimate std devs under the target; no adaption for RWMH, keep hand tuning param
     estimated_target_std_deviations = adapt_preconditioner(explorer.preconditioner, reduced_recorders)
 
-    # new base stepsize = old_base_stepsize * 2 ^ mean_of_j
-    updated_step_size = explorer.step_size * 2.0 ^ mean(Pigeons.recorder_values(reduced_recorders.num_doubling))
+    # new base stepsize = old_base_stepsize * 2 ^ median_of_j (use median for robustness against outliers)
+    updated_step_size = explorer.step_size * 2.0 ^ median(Pigeons.recorder_values(reduced_recorders.step_size_exponent))
+    println(median(Pigeons.recorder_values(reduced_recorders.step_size_exponent)))
 
     # maybe adapt the jitter distribution based on observed average abs_exponent_diff
     updated_step_jitter = adapt_step_jitter(explorer.step_jitter, reduced_recorders.abs_exponent_diff)
@@ -118,6 +119,7 @@ function auto_rwmh!(
                 explorer.step_size_selector,
                 selector_params)
         @record_if_requested!(recorders, :num_doubling, (chain, abs(proposed_exponent))) #record number of doublings/halvings
+        @record_if_requested!(recorders, :step_size_exponent, (chain, proposed_exponent)) #record number of doublings/halvings
         proposed_jitter = rand(rng, explorer.step_jitter.dist)
         proposed_step_size = explorer.step_size * 2.0^(proposed_exponent+proposed_jitter)
 
@@ -242,7 +244,8 @@ function Pigeons.explorer_recorder_builders(explorer::SimpleRWMH)
         abs_exponent_diff,
         energy_jump_distance,
         jitter_proposal_log_diff,
-        num_doubling
+        num_doubling,
+        step_size_exponent
     ]
     if explorer.preconditioner isa Pigeons.AdaptedDiagonalPreconditioner
         push!(result, Pigeons._transformed_online) # for mass matrix adaptation

@@ -5,7 +5,7 @@ using DocStringExtensions
 using LogDensityProblems
 using LogDensityProblemsAD: ADgradient
 using Random: AbstractRNG, randn!, randexp
-using Statistics: mean
+using Statistics: mean, median
 
 using DynamicPPL: DynamicPPL
 

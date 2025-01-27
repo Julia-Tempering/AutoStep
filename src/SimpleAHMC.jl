@@ -63,8 +63,10 @@ function Pigeons.adapt_explorer(explorer::SimpleAHMC, reduced_recorders, current
     # re-estimate std devs under the target; no adaptation for HMC/ MALA
     estimated_target_std_deviations = adapt_preconditioner(explorer.preconditioner, reduced_recorders)
 
-    # new base stepsize = old_base_stepsize * 2 ^ mean_of_j
-    updated_step_size = explorer.step_size * 2.0 ^ mean(Pigeons.recorder_values(reduced_recorders.num_doubling))
+    # new base stepsize = old_base_stepsize * 2 ^ median_of_j (use median for robustness against outliers)
+    updated_step_size = explorer.step_size * 2.0 ^ median(Pigeons.recorder_values(reduced_recorders.step_size_exponent))
+    println(updated_step_size)
+    println(median(Pigeons.recorder_values(reduced_recorders.step_size_exponent)))
 
     # update integration time
     new_int_time = adapt_integration_time(
@@ -141,6 +143,7 @@ function auto_hmc!(
         proposed_jitter = rand(rng, explorer.step_jitter.dist)
         proposed_step_size = explorer.step_size * 2.0^(proposed_exponent+proposed_jitter)
         @record_if_requested!(recorders, :num_doubling, (chain, abs(proposed_exponent)))
+        @record_if_requested!(recorders, :step_size_exponent, (chain, proposed_exponent))
 
         # move to proposed point
         hamiltonian_dynamics!(
@@ -285,7 +288,8 @@ function Pigeons.explorer_recorder_builders(explorer::SimpleAHMC)
         explorer_n_logprob,
         energy_jump_distance,
         jitter_proposal_log_diff,
-        num_doubling
+        num_doubling,
+        step_size_exponent
     ]
     gradient_based_sampler_recorders!(result, explorer)
     add_int_time_recorder!(result, explorer.int_time)
