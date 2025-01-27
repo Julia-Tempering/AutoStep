@@ -65,8 +65,6 @@ function Pigeons.adapt_explorer(explorer::SimpleAHMC, reduced_recorders, current
 
     # new base stepsize = old_base_stepsize * 2 ^ median_of_j (use median for robustness against outliers)
     updated_step_size = explorer.step_size * 2.0 ^ median(Pigeons.recorder_values(reduced_recorders.step_size_exponent))
-    println(updated_step_size)
-    println(median(Pigeons.recorder_values(reduced_recorders.step_size_exponent)))
 
     # update integration time
     new_int_time = adapt_integration_time(

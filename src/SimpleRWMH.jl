@@ -47,7 +47,6 @@ function Pigeons.adapt_explorer(explorer::SimpleRWMH, reduced_recorders, current
 
     # new base stepsize = old_base_stepsize * 2 ^ median_of_j (use median for robustness against outliers)
     updated_step_size = explorer.step_size * 2.0 ^ median(Pigeons.recorder_values(reduced_recorders.step_size_exponent))
-    println(median(Pigeons.recorder_values(reduced_recorders.step_size_exponent)))
 
     # maybe adapt the jitter distribution based on observed average abs_exponent_diff
     updated_step_jitter = adapt_step_jitter(explorer.step_jitter, reduced_recorders.abs_exponent_diff)
