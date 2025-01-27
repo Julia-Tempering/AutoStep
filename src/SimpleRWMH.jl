@@ -45,8 +45,8 @@ function Pigeons.adapt_explorer(explorer::SimpleRWMH, reduced_recorders, current
     # re-estimate std devs under the target; no adaption for RWMH, keep hand tuning param
     estimated_target_std_deviations = adapt_preconditioner(explorer.preconditioner, reduced_recorders)
 
-    # use the mean across chains of the mean shrink/grow factor to compute a new baseline stepsize
-    updated_step_size = explorer.step_size * mean(Pigeons.recorder_values(reduced_recorders.as_factors))
+    # new base stepsize = old_base_stepsize * 2 ^ mean_of_j
+    updated_step_size = explorer.step_size * 2.0 ^ mean(Pigeons.recorder_values(reduced_recorders.num_doubling))
 
     # maybe adapt the jitter distribution based on observed average abs_exponent_diff
     updated_step_jitter = adapt_step_jitter(explorer.step_jitter, reduced_recorders.abs_exponent_diff)

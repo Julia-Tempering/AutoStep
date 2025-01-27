@@ -63,8 +63,8 @@ function Pigeons.adapt_explorer(explorer::SimpleAHMC, reduced_recorders, current
     # re-estimate std devs under the target; no adaptation for HMC/ MALA
     estimated_target_std_deviations = adapt_preconditioner(explorer.preconditioner, reduced_recorders)
 
-    # use the mean across chains of the mean shrink/grow factor to compute a new baseline stepsize
-    updated_step_size = explorer.step_size * mean(Pigeons.recorder_values(reduced_recorders.as_factors))
+    # new base stepsize = old_base_stepsize * 2 ^ mean_of_j
+    updated_step_size = explorer.step_size * 2.0 ^ mean(Pigeons.recorder_values(reduced_recorders.num_doubling))
 
     # update integration time
     new_int_time = adapt_integration_time(
