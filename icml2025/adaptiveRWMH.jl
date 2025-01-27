@@ -19,7 +19,7 @@ function adaptive_rwmh_sample_from_model(model, seed, n_rounds; max_samples = 2^
     for i in 1:n_rounds
         n_samples = 2^i
         my_time += @elapsed chain = sample(my_model, RobustAdaptiveMetropolis(), n_samples; 
-            chain_type = Chains, initial_params = initial_params)
+            chain_type = Chains, initial_params = initial_params, progress = true)
         n_logprob += 2*n_samples # 2 logprob evaluations: one for the proposal, one for the current state
         samples = [chain[param] for param in names(chain)[1:end-1]] # discard aux vars
         samples = [vec(sample) for sample in samples] # convert to vectors
@@ -38,4 +38,4 @@ function adaptive_rwmh_sample_from_model(model, seed, n_rounds; max_samples = 2^
     return samples, stats_df
 end
 
-samples, stats_df = adaptive_rwmh_sample_from_model("funnel2", 1, 10)
+samples, stats_df = adaptive_rwmh_sample_from_model("funnel2", 1, 15)

@@ -1,7 +1,8 @@
+## TODO: ks ess
+
 using Statistics
 using StatsBase
 
-# utility function to create models for Turing.NUTS()
 # Define the Funnel model.
 struct Funnel
     dim::Int
@@ -19,7 +20,7 @@ LogDensityProblems.dimension(model::Funnel) = model.dim + 1
 LogDensityProblems.capabilities(::Funnel) = LogDensityProblems.LogDensityOrder{0}()
 
 
-
+# utility function to match models for adaptive RWMH
 function turing_nuts_model(model, data)
 	if startswith(model, "funnel")
 		return Funnel(data["dim"], data["scale"])
