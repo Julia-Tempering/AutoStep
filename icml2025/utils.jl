@@ -6,6 +6,8 @@ using Suppressor, BridgeStan, HypothesisTests
 function model_to_target(model)
     if startswith(model, "funnel2")
         return Pigeons.stan_funnel(1, 0.1)
+    elseif startswith(model, "funnel100")
+        return Pigeons.stan_funnel(100, 0.1)
     end
 end
 
