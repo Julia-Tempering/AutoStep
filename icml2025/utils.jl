@@ -1,5 +1,13 @@
 using Statistics, StatsBase, LogDensityProblems, DataFrames, CSV
-using Suppressor
+using Suppressor, BridgeStan, HypothesisTests
+
+
+# convert model to pigeon-digestable model
+function model_to_target(model)
+    if startswith(model, "funnel2")
+        return Pigeons.stan_funnel(1, 0.1)
+    end
+end
 
 # Define the Funnel model.
 struct Funnel

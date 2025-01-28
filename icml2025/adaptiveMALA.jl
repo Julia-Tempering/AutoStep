@@ -40,7 +40,8 @@ function adaptive_mala_sample_from_model(model, seed, n_rounds; max_samples = 2^
 	acceptance_prob = sum(stat.is_accept for stat in stats) / n_samples
     energy_jump_dist = mean(abs.(diff([stat.log_density for stat in stats])))
 	stats_df = DataFrame(
-		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0, 
+        explorer = "adaptive MALA", model = model, 
+		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0.0, 
         n_logprob = n_logprob, n_steps = n_steps,
 		miness = miness, minKSess = minKSess, acceptance_prob = acceptance_prob, step_size = step_size, 
         n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)

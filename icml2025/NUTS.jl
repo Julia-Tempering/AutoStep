@@ -35,7 +35,8 @@ function nuts_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwarg
 	step_size = mean(chain[:step_size])
 	energy_jump_dist = mean(abs.(diff(chain[:log_density], dims = 1)))
 	stats_df = DataFrame(
-		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0, 
+        explorer = "NUTS", model = model, 
+		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0.0, 
         n_logprob = n_logprob, n_steps = n_steps,
 		miness = miness, minKSess = minKSess, acceptance_prob = acceptance_prob, step_size = step_size, 
         n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)

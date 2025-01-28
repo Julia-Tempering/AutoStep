@@ -33,9 +33,10 @@ function adaptive_rwmh_sample_from_model(model, seed, n_rounds; max_samples = 2^
     acceptance_prob = sum(1 for i in 2:n_samples if samples[i] != samples[i-1])/(n_samples - 1)
     energy_jump_dist = mean(abs.(diff(chain[:lp], dims=1)))
     stats_df = DataFrame(
-        mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time=my_time, jitter_std = 0, n_logprob = n_logprob, 
+        explorer = "adaptive RWMH", model = model, 
+        mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time=my_time, jitter_std = 0.0, n_logprob = n_logprob, 
         n_steps=0, #zero gradient
-        miness=miness, minKSess = minKSess, acceptance_prob=acceptance_prob, step_size=0, n_rounds = n_rounds, 
+        miness=miness, minKSess = minKSess, acceptance_prob=acceptance_prob, step_size=0.0, n_rounds = n_rounds, 
         energy_jump_dist = energy_jump_dist)
     return samples, stats_df
 end

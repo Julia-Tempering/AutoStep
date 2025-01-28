@@ -146,7 +146,8 @@ function drhmc_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwar
 	var_1st_dim = var(samples[1])
     energy_jump_dist = mean(abs.(diff(log_densities)))
 	stats_df = DataFrame(
-		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0, 
+        explorer = "DRHMC", model = model, 
+		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0.0, 
         n_logprob = n_logprob, n_steps = n_steps,
 		miness = miness, minKSess = minKSess, acceptance_prob = acceptance_rate, step_size = step_size, 
         n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)
