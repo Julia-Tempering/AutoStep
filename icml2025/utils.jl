@@ -30,7 +30,7 @@ end
 
 function stan_data(model::String; dataset = nothing, dim = nothing, scale = nothing)
 	if startswith(model, "funnel2")
-		Dict("dim" => 1.0, "scale" => 0.03)
+		Dict("dim" => 1.0, "scale" => 0.1)
 	elseif startswith(model, "funnel100")
 		Dict("dim" => 99, "scale" => 0.03)
 	else

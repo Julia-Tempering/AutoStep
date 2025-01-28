@@ -112,7 +112,7 @@ function drhmc_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwar
 	my_data = stan_data(model)
 	my_model = logdens_model(model, my_data)
     log_density_q(x) = LogDensityProblems.logdensity(my_model, x)
-    dim = Int(my_data["dim"])
+    dim = Int(my_data["dim"] + 1)
     # initialize DRHMC
     step_size = 0.1      # initial step size
     n_leapfrogs = 10     # Number of leapfrog steps per proposal(only in DRHMC)
@@ -129,16 +129,17 @@ function drhmc_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwar
 
 	local samples
 	local log_densities
-    local acceptance_prob
+    local acceptance_rate
 	for i in 1:n_rounds
         n_samples = 2^i
-		my_time += @elapsed samples, log_densities, halvings, acceptance_prob, grad_eval, logprob_eval = 
-            dr_hmc(n_samples, step_size, n_leapfrogs, k_retries, a_factor, M, log_density_q, dim)
+		my_time += @elapsed samples, log_densities, halvings, acceptance_rate, grad_eval, logprob_eval = 
+            dr_hmc(n_samples, step_size, n_leapfrogs, k_retries, a_factor, M, log_density_q, dim; initial_params = initial_params)
         println(my_time)
 		n_steps += grad_eval # one leapfrog per iteration, one grad evaluation per leapfrog
 		n_logprob += logprob_eval # one for proposal, one for current state
         samples = [samples[i, :] for i in 1:size(samples, 1)]
 		miness = min_ess_all_methods(samples, model)
+        println(miness)
         initial_params = samples[end]
 	end
 	mean_1st_dim = mean(samples[1])
@@ -146,27 +147,8 @@ function drhmc_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwar
     energy_jump_dist = mean(abs.(diff(log_densities)))
 	stats_df = DataFrame(
 		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0, n_logprob = n_logprob, n_steps = n_steps,
-		miness = miness, acceptance_prob = acceptance_prob, step_size = step_size, n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)
+		miness = miness, acceptance_prob = acceptance_rate, step_size = step_size, n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)
 	return samples, stats_df
 end
 
-drhmc_sample_from_model("funnel2", 1, 10)
-
-
-
-#= # Run DR-HMC sampler with Neal's Funnel
-model = "funnel2"
-my_data = stan_data(model)
-my_model = logdens_model(model, my_data)
-log_density_q(x) = LogDensityProblems.logdensity(my_model, x)
-n_samples = 5000
-epsilon = 0.05             # Initial step size
-dim_x = my_data["dim"]
-n_steps = 10         # Number of leapfrog steps per proposal(only in DRHMC)
-k_retries = 10       # Maximum number of retries (delayed rejection)
-a_factor = 2.0       # Step size reduction factor for retries
-M = Diagonal(ones(Int(dim_x + 1)))      # Mass matrix
-
-Random.seed!(1)
-# sample from DR HMC
-samples, log_densities, halvings, acceptance_rate, grad_eval, logprob_eval = dr_hmc(n_samples, epsilon, n_steps, k_retries, a_factor, M, log_density_q, 2) =#
+samples, stats_df = drhmc_sample_from_model("funnel2", 1, 10)
