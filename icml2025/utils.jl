@@ -1,6 +1,5 @@
-## TODO: ks ess
-
-using Statistics, StatsBase, LogDensityProblems, DataFrames
+using Statistics, StatsBase, LogDensityProblems, DataFrames, CSV
+using Suppressor
 
 # Define the Funnel model.
 struct Funnel
@@ -174,3 +173,82 @@ function df_to_vec(df::DataFrame)
     end 
     return df_vec
 end 
+
+
+
+###############################################################################
+# utils for ksess metrics
+###############################################################################
+
+# with known distribution
+function KSess_one_sample(xs, target)
+	T = length(xs)
+	N = 40
+	B = Int(ceil(T/N))
+
+	# check for bad failure first
+	res = @suppress ExactOneSampleKSTest(xs, target)
+	ess2 = (log(2) * sqrt(π/2) / res.δ)^2
+	if ess2 ≤ T*(log(2) * sqrt(π/2))^2/B
+		return ess2
+	end
+	
+	# reasonably functioning; get better ess estimate in this regime
+	batches = [i:min(T, i+B-1) for i in 1:B:T]
+	if length(batches[end]) < B
+		b = pop!(batches)
+		batches[end] = (batches[end][begin]):(b[end])
+	end
+	s = 0
+	for b in batches
+		res = @suppress ExactOneSampleKSTest(xs[b], target)
+		s += sqrt(length(b))*res.δ
+	end
+	s /= (length(batches) * log(2) * sqrt(π/2))
+	ess2 = T*s^(-2)
+	return T*s^(-2)
+end
+
+
+# with unknown distribution
+function KSess_two_sample(xs, target)
+	T = length(xs)
+	N = 40
+	B = Int(ceil(T/N))
+
+	# check for bad failure first
+	res = @suppress ApproximateTwoSampleKSTest(xs, target)
+	ess2 = (log(2) * sqrt(π/2) / res.δ)^2
+	if ess2 ≤ T*(log(2) * sqrt(π/2))^2/B
+		return ess2
+	end
+	
+	# reasonably functioning; get better ess estimate in this regime
+	batches = [i:min(T, i+B-1) for i in 1:B:T]
+	if length(batches[end]) < B
+		b = pop!(batches)
+		batches[end] = (batches[end][begin]):(b[end])
+	end
+	s = 0
+	for b in batches
+		res = @suppress ApproximateTwoSampleKSTest(xs[b], target)
+		s += sqrt(length(b))*res.δ
+	end
+	s /= (length(batches) * log(2) * sqrt(π/2))
+	ess2 = T*s^(-2)
+	return T*s^(-2)
+end
+
+# get the minimum ksess of all margins
+function min_KSess(samples, model)
+    if startswith(model, "funnel")
+        target1 = Normal(0, 3)
+        miness = KSess_one_sample(getindex.(samples, 1), target1)
+        target2 = CSV.read("icml2025/samples/funnel2.csv", DataFrame)
+        target2 = collect(target2[2,:])
+        for i in 2:length(samples[1])
+            miness = min(miness, KSess_two_sample(getindex.(samples, i), target2))
+        end
+        return miness
+    end
+end

@@ -28,19 +28,22 @@ function adaptive_mala_sample_from_model(model, seed, n_rounds; max_samples = 2^
 	for i in 1:n_rounds
         n_samples = 2^i
 		my_time += @elapsed samples, stats = sample(hamiltonian, kernel, zeros(dim), n_samples, adaptor, n_adapts; 
-            progress = true, initial_params = initial_params)
+            progress = true) #, initial_params = initial_params)
 		n_steps += n_samples # one leapfrog per iteration, one grad evaluation per leapfrog
 		n_logprob += 2 * n_samples # one for proposal, one for current state
-		miness = min_ess_all_methods(samples, model)
-        initial_params = samples[end]
+        # initial_params = samples[end]
 	end
+    miness = min_ess_all_methods(samples, model)
+    minKSess = min_KSess(samples, model)
 	mean_1st_dim = mean(samples[1])
 	var_1st_dim = var(samples[1])
 	acceptance_prob = sum(stat.is_accept for stat in stats) / n_samples
     energy_jump_dist = mean(abs.(diff([stat.log_density for stat in stats])))
 	stats_df = DataFrame(
-		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0, n_logprob = n_logprob, n_steps = n_steps,
-		miness = miness, acceptance_prob = acceptance_prob, step_size = step_size, n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)
+		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0, 
+        n_logprob = n_logprob, n_steps = n_steps,
+		miness = miness, minKSess = minKSess, acceptance_prob = acceptance_prob, step_size = step_size, 
+        n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)
 	return samples, stats_df
 end
 
