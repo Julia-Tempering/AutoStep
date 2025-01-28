@@ -30,19 +30,20 @@ for model in models
         samples_rwmh, stats_rwmh = adaptive_rwmh_sample_from_model(model, seed, n_rounds)
         samples_mala, stats_mala = adaptive_mala_sample_from_model(model, seed, n_rounds)
         samples_nuts, stats_nuts = nuts_sample_from_model(model, seed, n_rounds)
+        println("Current at seed $seed")
         samples_drhmc, stats_drhmc = drhmc_sample_from_model(model, seed, n_rounds)
         samples_autorwmh, stats_autorwmh = pt_sample_from_model(model, seed, "AutoStep RWMH", n_rounds)
         samples_automala, stats_automala = pt_sample_from_model(model, seed, "AutoStep MALA", n_rounds)
         samples_slicer, stats_slicer = pt_sample_from_model(model, seed, "HitAndRunSlicer", n_rounds)
         # save the samples from the first run
         if seed == 5
-            CSV.write("icml2025/samples/funnel2_adaptive_rwmh.csv", DataFrame(samples_rwmh, :auto))
-            CSV.write("icml2025/samples/funnel2_adaptive_mala.csv", DataFrame(samples_mala, :auto))
-            CSV.write("icml2025/samples/funnel2_nuts.csv", DataFrame(samples_nuts, :auto))
-            CSV.write("icml2025/samples/funnel2_drhmc.csv", DataFrame(samples_drhmc, :auto))
-            CSV.write("icml2025/samples/funnel2_autorwmh.csv", DataFrame(samples_autorwmh, :auto))
-            CSV.write("icml2025/samples/funnel2_automala.csv", DataFrame(samples_automala, :auto))
-            CSV.write("icml2025/samples/funnel2_slicer.csv", DataFrame(samples_slicer, :auto))
+            CSV.write("icml2025/samples/$(model)_adaptive_rwmh.csv", DataFrame(samples_rwmh, :auto))
+            CSV.write("icml2025/samples/$(model)_adaptive_mala.csv", DataFrame(samples_mala, :auto))
+            CSV.write("icml2025/samples/$(model)_nuts.csv", DataFrame(samples_nuts, :auto))
+            CSV.write("icml2025/samples/$(model)_drhmc.csv", DataFrame(samples_drhmc, :auto))
+            CSV.write("icml2025/samples/$(model)_autorwmh.csv", DataFrame(samples_autorwmh, :auto))
+            CSV.write("icml2025/samples/$(model)_automala.csv", DataFrame(samples_automala, :auto))
+            CSV.write("icml2025/samples/$(model)_slicer.csv", DataFrame(samples_slicer, :auto))
         end
         # concatenate the dataframe of experiment results
         append!(exp_results, stats_rwmh)

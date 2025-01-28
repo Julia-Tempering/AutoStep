@@ -7,7 +7,11 @@ function model_to_target(model)
     if startswith(model, "funnel2")
         return Pigeons.stan_funnel(1, 0.1)
     elseif startswith(model, "funnel100")
-        return Pigeons.stan_funnel(100, 0.1)
+        return Pigeons.stan_funnel(99, 0.1)
+    elseif startswith(model, "mRNA")
+        stan_example_path(name) = dirname(dirname(pathof(Pigeons))) * "/examples/$name"
+        StanLogPotential(stan_example_path("stan/mRNA.stan"), "data/mRNA.json")
+    # TODO: 5 remaining benchmarks
     end
 end
 
