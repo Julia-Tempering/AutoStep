@@ -6,7 +6,7 @@ include("utils.jl")
 function adaptive_rwmh_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwargs...)
     # make model and data from the arguments
     my_data = stan_data(model)
-    my_model = turing_nuts_model(model, my_data)
+    my_model = logdens_model(model, my_data)
     Random.seed!(seed)
 
     # run until minESS threshold is reached

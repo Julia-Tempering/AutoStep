@@ -2,12 +2,10 @@ using AdvancedHMC, Distributions, MCMCChains, LogDensityProblems, LinearAlgebra
 using CSV, DataFrames, DelimitedFiles, JSON, Turing, Random, ForwardDiff
 include("utils.jl")
 
-
-# using NUTS in Turing.jl
 function adaptive_mala_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwargs...)
 	# make model and data from the arguments
 	my_data = stan_data(model)
-	my_model = turing_nuts_model(model, my_data)
+	my_model = logdens_model(model, my_data)
 	Random.seed!(seed)
 
 	n_samples = 2
