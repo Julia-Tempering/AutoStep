@@ -20,8 +20,8 @@ function sample_funnel(N, scale)
     samples = Matrix{Float64}(undef, 2, N)  # Store samples as a 2×N matrix
 
     for i in 1:N
-        v = rand(Normal(0, 3))  # Sample v from N(0,1)
-        x = rand(Normal(0, exp(0.5 * v / scale)))  # Sample x from N(0, exp(scale * v))
+        v = rand(Normal(0, 3))
+        x = rand(Normal(0, exp(v / scale)))  # Sample x from N(0, exp(scale * v))
         samples[:, i] = [v, x]  # Store in matrix
     end
 
@@ -29,7 +29,7 @@ function sample_funnel(N, scale)
 end
 
 N = 10000000
-scale = 0.3
+scale = 0.6
 samples = sample_funnel(N, scale)
 samples = DataFrame(samples, :auto)
 CSV.write("icml2025/samples/funnel2.csv", samples) =#
