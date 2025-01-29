@@ -401,10 +401,10 @@ end
 
 # get the minimum ksess of all margins
 function min_KSess(samples, model)
-    if startswith(model, "funnel")
+    if startswith(model, "funnel100")
         reference_samples = CSV.read("icml2025/samples/funnel2.csv", DataFrame)
-        miness = KSess_one_sample(getindex.(samples, 1), collect(target2[1,:]))
-        ys = collect(target2[2,:])
+        miness = KSess_one_sample(getindex.(samples, 1), collect(reference_samples[1,:]))
+        ys = collect(reference_samples[2,:])
         for i in 2:length(samples[1])
             miness = min(miness, KSess_two_sample(getindex.(samples, i), ys))
         end
@@ -413,7 +413,7 @@ function min_KSess(samples, model)
         miness = Inf
         reference_samples = CSV.read("icml2025/samples/$(model).csv", DataFrame)
         for i in 1:length(samples[1])
-            ys = collect(target2[i,:])
+            ys = collect(reference_samples[i,:])
             miness = min(miness, KSess_two_sample(getindex.(samples, i), ys))
         end
         return miness
