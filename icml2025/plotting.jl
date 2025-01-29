@@ -22,7 +22,6 @@ end
 #=
 comparison of all autoMCMC samplers and NUTS; experiment = "post_db"
 =#
-df = 
 function comparison_plots(df::DataFrame)
     # prepare dataframe
     df.cost = ifelse.(
@@ -39,23 +38,26 @@ function comparison_plots(df::DataFrame)
     # Create the grouped boxplot for minESS/sec, minESS/cost, minKSess/sec, minKSess/cost
     @df df StatsPlots.groupedboxplot(:model, :miness_per_sec, group=:explorer, xlabel="Model", ylabel="minESS / sec", 
         legend=:bottomleft, color=:auto, yaxis=:log10)
-    savefig("plots/miness_per_sec.png")
+    savefig("icml2025/plots/miness_per_sec.png")
     @df df StatsPlots.groupedboxplot(:model, :miness_per_cost, group=:explorer, xlabel="Model", ylabel="minESS / cost", 
         legend=:bottomleft, color=:auto, yaxis=:log10)
-    savefig("plots/miness_per_cost.png")
+    savefig("icml2025/plots/miness_per_cost.png")
     @df df StatsPlots.groupedboxplot(:model, :minKSess_per_sec, group=:explorer, xlabel="Model", ylabel="min KSESS / sec", 
         legend=:bottomleft, color=:auto, yaxis=:log10)
-    savefig("plots/minKSess_per_sec.png")
+    savefig("icml2025/plots/minKSess_per_sec.png")
     @df df StatsPlots.groupedboxplot(:model, :minKSess_per_cost, group=:explorer, xlabel="Model", ylabel="min KSESS / cost", 
         legend=:bottomleft, color=:auto, yaxis=:log10)
-    savefig("plots/minKSess_per_cost.png")
+    savefig("icml2025/plots/minKSess_per_cost.png")
 
     # the energy jump plot
     @df df StatsPlots.groupedboxplot(:model, :energy_jump_dist, group=:explorer, xlabel="Model", 
     ylabel="Average Energy Jump Distance", legend=:topleft, color=:auto, ylim= (-0.03,0.8))
-    savefig("plots/energy_jump.png")
+    savefig("icml2025/plots/energy_jump.png")
     # the acceptance rate plot
     @df df StatsPlots.groupedboxplot(:model, :acceptance_prob, group=:explorer, xlabel="Model", 
     ylabel="Average Acceptance Rate", legend=:topleft, color=:auto, ylim= (-0.03,1.2))
-    savefig("plots/accept_rate.png")
+    savefig("icml2025/plots/accept_rate.png")
 end
+
+df = CSV.read("icml2025/exp_results.csv", DataFrame)
+comparison_plots(df)
