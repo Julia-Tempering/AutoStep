@@ -1,5 +1,3 @@
-include("../test/activate_test_env.jl")
-
 include("adaptiveRWMH.jl")
 include("adaptiveMALA.jl")
 include("nuts.jl")

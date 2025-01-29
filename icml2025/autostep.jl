@@ -1,3 +1,4 @@
+# include("../test/activate_test_env.jl")
 include("utils.jl")
 
 function pt_sample_from_model(model, seed, my_explorer, n_rounds)
@@ -7,9 +8,12 @@ function pt_sample_from_model(model, seed, my_explorer, n_rounds)
         Pigeons.reversibility_rate; online
     ]
     explorer = if my_explorer == "AutoStep RWMH"
-        SimpleRWMH()
+        SimpleRWMH(step_jitter = AutoStep.StepJitter(dist = Dirac(0), adaptive_strategy = AutoStep.FixedStepJitter()),
+                    preconditioner = Pigeons.IdentityPreconditioner())
     elseif my_explorer == "AutoStep MALA"
-        SimpleAHMC(int_time = AutoStep.FixedIntegrationTime())
+        SimpleAHMC(int_time = AutoStep.FixedIntegrationTime(),
+                    step_jitter = AutoStep.StepJitter(dist = Dirac(0), adaptive_strategy = AutoStep.FixedStepJitter()),
+                    preconditioner = Pigeons.IdentityPreconditioner())
     elseif my_explorer == "HitAndRunSlicer"
         HitAndRunSlicer()
     end
@@ -41,7 +45,7 @@ function pt_sample_from_model(model, seed, my_explorer, n_rounds)
         round += 1 
     end
     miness = min_ess_all_methods(samples, model)
-    # minKSess = min_KSess(samples, model)
+    minKSess = min_KSess(samples, model)
     mean_1st_dim = first(mean(pt))
     var_1st_dim = first(var(pt))
     step_size = if explorer isa SliceSampler
@@ -60,11 +64,11 @@ function pt_sample_from_model(model, seed, my_explorer, n_rounds)
     stats_df = DataFrame(
         explorer = my_explorer, model = model, seed = seed, 
         mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time=time, jitter_std = jitter_std, n_logprob = n_logprob, 
-        n_steps=n_steps, miness=miness, minKSess = 0, acceptance_prob=acceptance_prob, step_size=step_size, 
+        n_steps=n_steps, miness=miness, minKSess = minKSess, acceptance_prob=acceptance_prob, step_size=step_size, 
         n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)
     return samples, stats_df
 end
 
-#pt_sample_from_model("funnel2", 1, "AutoStep RWMH", 15)
+pt_sample_from_model("funnel2", 1, "AutoStep RWMH", 15)
 #pt_sample_from_model("funnel2", 1, "AutoStep MALA", 15)
 #pt_sample_from_model("funnel2", 1, "HitAndRunSlicer", 15)

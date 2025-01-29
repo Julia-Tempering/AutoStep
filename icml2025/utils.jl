@@ -38,7 +38,7 @@ function LogDensityProblems.logdensity(model::Funnel, x)
     if length(x) != dim
         return -Inf
     end
-    return logpdf(Normal(0, 3), x[1]) + sum(logpdf.(Normal(0, exp(0.5 * x[1] / model.scale)), x[2:end]))
+    return logpdf(Normal(0, 3), x[1]) + sum(logpdf.(Normal(0, exp(x[1] / model.scale)), x[2:end]))
 end
 LogDensityProblems.dimension(model::Funnel) = model.dim + 1
 LogDensityProblems.capabilities(::Funnel) = LogDensityProblems.LogDensityOrder{0}()
@@ -339,14 +339,46 @@ end
 
 
 # with unknown distribution
-function KSess_two_sample(xs, target)
+function twosample_sortedref(xs, ysort)
+	ny = length(ysort)
+	nx = length(xs)
+	δx = 1.0/nx
+	δy = 1.0/ny
+	xsort = sort(xs)
+	curFy = 0.0
+	curiy = 0
+	curFx = 0.0
+	curix = 0
+	δ = 0.0
+	while (curiy < ny) || (curix < nx)
+		if (curiy == ny)
+		    curix += 1
+			curFx += δx
+		elseif (curix == nx)
+			curiy += 1
+			curFy += δy
+		elseif (xsort[curix+1] < ysort[curiy+1])
+			curix += 1
+			curFx += δx
+		else
+			curiy += 1
+			curFy += δy
+		end
+		δ = max(δ, abs(curFx - curFy))
+	end
+	return δ
+end
+
+function KSess_two_sample(xs, ys)
 	T = length(xs)
 	N = 40
 	B = Int(ceil(T/N))
 
+	ysort = sort(ys)
+
 	# check for bad failure first
-	res = @suppress ApproximateTwoSampleKSTest(xs, target)
-	ess2 = (log(2) * sqrt(π/2) / res.δ)^2
+	δ = twosample_sortedref(xs, ysort) #@suppress ApproximateTwoSampleKSTest(xs, ys)
+	ess2 = (log(2) * sqrt(π/2) / δ)^2
 	if ess2 ≤ T*(log(2) * sqrt(π/2))^2/B
 		return ess2
 	end
@@ -357,10 +389,10 @@ function KSess_two_sample(xs, target)
 		b = pop!(batches)
 		batches[end] = (batches[end][begin]):(b[end])
 	end
-	s = 0
+	s = 0.0
 	for b in batches
-		res = @suppress ApproximateTwoSampleKSTest(xs[b], target)
-		s += sqrt(length(b))*res.δ
+		δ = twosample_sortedref(xs[b],ysort) #@suppress ApproximateTwoSampleKSTest(xs[b], ys)
+		s += sqrt(length(b))*δ
 	end
 	s /= (length(batches) * log(2) * sqrt(π/2))
 	ess2 = T*s^(-2)
@@ -376,6 +408,14 @@ function min_KSess(samples, model)
         target2 = collect(target2[2,:])
         for i in 2:length(samples[1])
             miness = min(miness, KSess_two_sample(getindex.(samples, i), target2))
+        end
+        return miness
+    else
+        miness = Inf
+        reference_samples = CSV.read("icml2025/samples/$(model).csv", DataFrame)
+        for i in 1:length(samples[1])
+            ys = collect(target2[i,:])
+            miness = min(miness, KSess_two_sample(getindex.(samples, i), ys))
         end
         return miness
     end

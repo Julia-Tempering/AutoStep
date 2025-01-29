@@ -1,8 +1,10 @@
 using Pigeons, DataFrames, CSV, BridgeStan
 include(joinpath(dirname(dirname(pathof(Pigeons))), "test", "supporting", "postdb.jl"))
+stan_example_path(name) = dirname(dirname(pathof(Pigeons))) * "/examples/$name"
 
 pt = pigeons(
-    target = StanLogPotential("icml2025/data/horseshoe_logit.stan", "icml2025/data/ionosphere.json"),
+    target = StanLogPotential(stan_example_path("stan/mRNA.stan"), "icml2025/data/mRNA.json"),
+    #StanLogPotential("icml2025/data/horseshoe_logit.stan", "icml2025/data/ionosphere.json"),
     variational = GaussianReference(first_tuning_round = 5),
     n_chains_variational = 5,
     record = [traces],
@@ -10,7 +12,7 @@ pt = pigeons(
 
 samples = get_sample(pt)
 samples = DataFrame(samples, :auto)
-CSV.write("icml2025/samples/prostate.csv", samples)
+CSV.write("icml2025/samples/mRNA.csv", samples)
 
 #= using Random, Distributions
 
