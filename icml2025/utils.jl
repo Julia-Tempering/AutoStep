@@ -403,7 +403,7 @@ end
 function min_KSess(samples, model)
     if startswith(model, "funnel100")
         reference_samples = CSV.read("icml2025/samples/funnel2.csv", DataFrame)
-        miness = KSess_one_sample(getindex.(samples, 1), collect(reference_samples[1,:]))
+        miness = KSess_two_sample(getindex.(samples, 1), collect(reference_samples[1,:]))
         ys = collect(reference_samples[2,:])
         for i in 2:length(samples[1])
             miness = min(miness, KSess_two_sample(getindex.(samples, i), ys))
