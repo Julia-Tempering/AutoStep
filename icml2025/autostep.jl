@@ -1,4 +1,4 @@
-# include("../test/activate_test_env.jl")
+include("../test/activate_test_env.jl")
 include("utils.jl")
 
 function pt_sample_from_model(model, seed, my_explorer, n_rounds)
@@ -8,11 +8,11 @@ function pt_sample_from_model(model, seed, my_explorer, n_rounds)
         Pigeons.reversibility_rate; online
     ]
     explorer = if my_explorer == "AutoStep RWMH"
-        SimpleRWMH(step_jitter = AutoStep.StepJitter(dist = Dirac(0), adaptive_strategy = AutoStep.FixedStepJitter()),
+        SimpleRWMH(step_jitter = AutoStep.StepJitter(Dirac(0), AutoStep.FixedStepJitter()),
                     preconditioner = Pigeons.IdentityPreconditioner())
     elseif my_explorer == "AutoStep MALA"
         SimpleAHMC(int_time = AutoStep.FixedIntegrationTime(),
-                    step_jitter = AutoStep.StepJitter(dist = Dirac(0), adaptive_strategy = AutoStep.FixedStepJitter()),
+                    step_jitter = AutoStep.StepJitter(Dirac(0), AutoStep.FixedStepJitter()),
                     preconditioner = Pigeons.IdentityPreconditioner())
     elseif my_explorer == "HitAndRunSlicer"
         HitAndRunSlicer()
@@ -69,6 +69,10 @@ function pt_sample_from_model(model, seed, my_explorer, n_rounds)
     return samples, stats_df
 end
 
-pt_sample_from_model("funnel2", 1, "AutoStep RWMH", 15)
+# using Plots, MCMCChains
+# samples, stats_df = pt_sample_from_model("funnel2", 7, "AutoStep RWMH", 16)
+# first_margin = [sample[1] for sample in samples]
+# histogram(first_margin)
+# print(stats_df)
 #pt_sample_from_model("funnel2", 1, "AutoStep MALA", 15)
 #pt_sample_from_model("funnel2", 1, "HitAndRunSlicer", 15)

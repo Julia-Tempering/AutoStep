@@ -5,9 +5,9 @@ using Suppressor, BridgeStan, HypothesisTests, Pigeons
 # convert model to pigeon-digestable model
 function model_to_target(model)
     if startswith(model, "funnel2")
-        return Pigeons.stan_funnel(1, 0.3)
+        return Pigeons.stan_funnel(1, 0.6)
     elseif startswith(model, "funnel100")
-        return Pigeons.stan_funnel(99, 0.1)
+        return Pigeons.stan_funnel(99, 0.6)
     elseif startswith(model, "mRNA")
         stan_example_path(name) = dirname(dirname(pathof(Pigeons))) * "/examples/$name"
         return StanLogPotential(stan_example_path("stan/mRNA.stan"), "icml2025/data/mRNA.json")
@@ -401,20 +401,19 @@ end
 
 # get the minimum ksess of all margins
 function min_KSess(samples, model)
-    if startswith(model, "funnel")
-        target1 = Normal(0, 3)
-        miness = KSess_one_sample(getindex.(samples, 1), target1)
-        target2 = CSV.read("icml2025/samples/funnel2.csv", DataFrame)
-        target2 = collect(target2[2,:])
+    if startswith(model, "funnel100")
+        reference_samples = CSV.read("icml2025/samples/funnel2.csv", DataFrame)
+        miness = KSess_two_sample(getindex.(samples, 1), collect(reference_samples[1,:]))
+        ys = collect(reference_samples[2,:])
         for i in 2:length(samples[1])
-            miness = min(miness, KSess_two_sample(getindex.(samples, i), target2))
+            miness = min(miness, KSess_two_sample(getindex.(samples, i), ys))
         end
         return miness
     else
         miness = Inf
         reference_samples = CSV.read("icml2025/samples/$(model).csv", DataFrame)
         for i in 1:length(samples[1])
-            ys = collect(target2[i,:])
+            ys = collect(reference_samples[i,:])
             miness = min(miness, KSess_two_sample(getindex.(samples, i), ys))
         end
         return miness
