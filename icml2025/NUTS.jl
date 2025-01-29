@@ -43,4 +43,4 @@ function nuts_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwarg
 	return samples, stats_df
 end
 
-nuts_sample_from_model("funnel2", 1, 15)
+#nuts_sample_from_model("funnel2", 1, 15)

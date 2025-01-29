@@ -112,7 +112,7 @@ function drhmc_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwar
 	my_data = stan_data(model)
 	my_model = logdens_model(model, my_data)
     log_density_q(x) = LogDensityProblems.logdensity(my_model, x)
-    dim = Int(my_data["dim"] + 1)
+    dim = LogDensityProblems.dimension(my_model)
     # initialize DRHMC
     step_size = 0.1      # initial step size
     n_leapfrogs = 10     # Number of leapfrog steps per proposal(only in DRHMC)
@@ -154,4 +154,4 @@ function drhmc_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwar
 	return samples, stats_df
 end
 
-samples, stats_df = drhmc_sample_from_model("funnel2", 1, 10)
+#samples, stats_df = drhmc_sample_from_model("funnel2", 1, 10)

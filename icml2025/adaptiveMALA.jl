@@ -48,4 +48,4 @@ function adaptive_mala_sample_from_model(model, seed, n_rounds; max_samples = 2^
 	return samples, stats_df
 end
 
-adaptive_mala_sample_from_model("funnel2", 1, 15)
+# adaptive_mala_sample_from_model("funnel2", 1, 15)

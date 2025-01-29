@@ -40,5 +40,3 @@ function adaptive_rwmh_sample_from_model(model, seed, n_rounds; max_samples = 2^
         energy_jump_dist = energy_jump_dist)
     return samples, stats_df
 end
-
-samples, stats_df = adaptive_rwmh_sample_from_model("funnel2", 1, 15)

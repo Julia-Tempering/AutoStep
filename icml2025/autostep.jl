@@ -65,6 +65,6 @@ function pt_sample_from_model(model, seed, my_explorer, n_rounds)
     return samples, stats_df
 end
 
-pt_sample_from_model("funnel2", 1, "AutoStep RWMH", 15)
-pt_sample_from_model("funnel2", 1, "AutoStep MALA", 15)
-pt_sample_from_model("funnel2", 1, "HitAndRunSlicer", 15)
+#pt_sample_from_model("funnel2", 1, "AutoStep RWMH", 15)
+#pt_sample_from_model("funnel2", 1, "AutoStep MALA", 15)
+#pt_sample_from_model("funnel2", 1, "HitAndRunSlicer", 15)

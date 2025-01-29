@@ -1,17 +1,29 @@
 using Statistics, StatsBase, LogDensityProblems, DataFrames, CSV
-using Suppressor, BridgeStan, HypothesisTests
+using Suppressor, BridgeStan, HypothesisTests, Pigeons
 
 
 # convert model to pigeon-digestable model
 function model_to_target(model)
     if startswith(model, "funnel2")
-        return Pigeons.stan_funnel(1, 0.1)
+        return Pigeons.stan_funnel(1, 0.3)
     elseif startswith(model, "funnel100")
         return Pigeons.stan_funnel(99, 0.1)
     elseif startswith(model, "mRNA")
         stan_example_path(name) = dirname(dirname(pathof(Pigeons))) * "/examples/$name"
-        StanLogPotential(stan_example_path("stan/mRNA.stan"), "data/mRNA.json")
-    # TODO: 5 remaining benchmarks
+        return StanLogPotential(stan_example_path("stan/mRNA.stan"), "icml2025/data/mRNA.json")
+    elseif startswith(model, "sonar")
+        return StanLogPotential("icml2025/data/horseshoe_logit.stan", "icml2025/data/sonar.json")
+    elseif startswith(model, "ionosphere")
+        return StanLogPotential("icml2025/data/horseshoe_logit.stan", "icml2025/data/ionosphere.json")
+    elseif startswith(model, "prostate")
+        return StanLogPotential("icml2025/data/horseshoe_logit.stan", "icml2025/data/prostate.json")
+    elseif startswith(model, "kilpisjarvi")
+        include(joinpath(dirname(dirname(pathof(Pigeons))), "test", "supporting", "postdb.jl"))
+        return log_potential_from_posterior_db("kilpisjarvi_mod-kilpisjarvi.json")
+    elseif startswith(model, "orbital")
+        # TODO: orbital
+    else
+		error("unknown model $model")
     end
 end
 
@@ -26,16 +38,115 @@ function LogDensityProblems.logdensity(model::Funnel, x)
     if length(x) != dim
         return -Inf
     end
-    return logpdf(Normal(0, 3), x[1]) + sum(logpdf.(Normal(0, exp(x[1] / model.scale)), x[2:end]))
+    return logpdf(Normal(0, 3), x[1]) + sum(logpdf.(Normal(0, exp(0.5 * x[1] / model.scale)), x[2:end]))
 end
 LogDensityProblems.dimension(model::Funnel) = model.dim + 1
 LogDensityProblems.capabilities(::Funnel) = LogDensityProblems.LogDensityOrder{0}()
 
+# Define the kilpisjarvi model
+struct Kilpisjarvi
+    x::Array
+    y::Array
+    N::Int
+    xpred::Float64
+    pmualpha::Float64
+    psalpha::Float64
+    pmubeta::Float64
+    psbeta::Float64
+end
+function LogDensityProblems.logdensity(model::Kilpisjarvi, x)
+    alpha = x[1]
+    beta = x[2]
+    sigma = x[3]
+    # priors
+    log_prior_alpha = logpdf(Normal(model.pmualpha, model.psalpha), alpha)
+    log_prior_beta = logpdf(Normal(model.pmubeta, model.psbeta), beta)
+    log_prior_sigma = logpdf(Normal(0, 1), sigma) - log(ccdf(Normal(0, 1), 0))  # Adjust for truncation
+    # log likelihood
+    log_likelihood = sum(logpdf(Normal(alpha + beta * model.x[i], sigma), model.y[i]) for i in 1:model.N)
+
+    return log_prior_alpha + log_prior_beta + log_prior_sigma + log_likelihood
+end
+LogDensityProblems.dimension(model::Kilpisjarvi) = 3
+LogDensityProblems.capabilities(::Kilpisjarvi) = LogDensityProblems.LogDensityOrder{0}()
+
+# Define the mRNA model
+struct mRNA
+    N::Int
+    ts::Vector{Float64}
+    ys::Vector{Float64}
+end
+function exp_a_minus_exp_b(a, b)
+    return a > b ? -exp(a) * expm1(b - a) : exp(b) * expm1(a - b)
+end
+function get_mu(tmt0, km0, beta, delta)
+    if tmt0 <= 0.0
+        return 0.0  # must force mu=0 when t < t0 (reaction hasn't started)
+    end
+    dmb = delta - beta
+    if abs(dmb) < eps()  # `eps()` gives machine precision in Julia
+        return km0 * tmt0
+    else
+        return km0 * exp_a_minus_exp_b(-beta * tmt0, -delta * tmt0) / dmb
+    end
+end
+function LogDensityProblems.logdensity(model::mRNA, x)
+    lt0, lkm0, lbeta, ldelta, lsigma = x
+    # transform
+    t0 = 10.0^lt0
+    km0 = 10.0^lkm0
+    beta = 10.0^lbeta
+    delta = 10.0^ldelta
+    sigma = 10.0^lsigma
+    # prior
+    log_prior_lt0 = logpdf(Uniform(-2, 1), lt0)
+    log_prior_lkm0 = logpdf(Uniform(-5, 5), lkm0)
+    log_prior_lbeta = logpdf(Uniform(-5, 5), lbeta)
+    log_prior_ldelta = logpdf(Uniform(-5, 5), ldelta)
+    log_prior_lsigma = logpdf(Uniform(-2, 2), lsigma)
+    # log likelihood
+    log_likelihood = sum(logpdf(Normal(get_mu(model.ts[i] - t0, km0, beta, delta), sigma), model.ys[i]) for i in 1:model.N)
+    return log_prior_lt0 + log_prior_lkm0 + log_prior_lbeta + log_prior_ldelta + log_prior_lsigma + log_likelihood
+end
+LogDensityProblems.dimension(model::mRNA) = 5
+LogDensityProblems.capabilities(::mRNA) = LogDensityProblems.LogDensityOrder{0}()
+
+# Define the sonar model
+struct Sonar
+    x::Array
+    y::Array
+    n::Int
+    d::Int
+end
+function LogDensityProblems.logdensity(model::Sonar, x)
+    tau = params[1]  # Global shrinkage parameter
+    lambda = params[2:model.d+1]  # Local shrinkage parameters (vector of length d)
+    beta0 = params[model.d+2]  # Intercept
+    beta = params[model.d+3:end]  # Regression coefficients (vector of length d)
+    # priors
+    log_prior_tau = logpdf(TDist(1), tau)  # Cauchy(0,1) prior for tau
+    log_prior_lambda = sum(logpdf(TDist(1), λ) for λ in lambda)  # Cauchy(0,1) priors for lambda
+    log_prior_beta0 = logpdf(LocationScale(0, 1, TDist(3)), beta0)  # Student-T(3) prior for intercept
+    log_prior_beta = logpdf(MvNormal(zeros(model.d), (tau .* lambda)), beta)  # Horseshoe prior for beta
+    # log likelihood (Bernoulli logit model)
+    log_likelihood = sum(logpdf(BernoulliLogit(beta0 + dot(model.x[i, :], beta)), model.y[i]) for i in 1:model.n)
+
+    return log_prior_tau + log_prior_lambda + log_prior_beta0 + log_prior_beta + log_likelihood
+end
+LogDensityProblems.dimension(model::Sonar) = 3
+LogDensityProblems.capabilities(::Sonar) = LogDensityProblems.LogDensityOrder{0}()
 
 # utility function to match models for all kernels
 function logdens_model(model, data)
 	if startswith(model, "funnel")
 		return Funnel(data["dim"], data["scale"])
+    elseif startswith(model, "kilpisjarvi")
+        return Kilpisjarvi(data["x"], data["y"], data["N"], data["xpred"], data["pmualpha"], 
+        data["psalpha"], data["pmubeta"], data["psbeta"])
+    elseif startswith(model, "mRNA")
+        return mRNA(data["N"], data["ts"], data["ys"])
+    elseif startswith(model, "sonar")
+        return Sonar(hcat(data["x"]...)', data["y"], data["n"], data["d"])
 	else
 		error("unknown model $model")
 	end
@@ -43,20 +154,24 @@ end
 
 function stan_data(model::String; dataset = nothing, dim = nothing, scale = nothing)
 	if startswith(model, "funnel2")
-		Dict("dim" => 1.0, "scale" => 0.1)
+		Dict("dim" => 1, "scale" => 0.3)
 	elseif startswith(model, "funnel100")
-		Dict("dim" => 99, "scale" => 0.03)
+		Dict("dim" => 99, "scale" => 0.5)
 	else
 		file_name = if startswith(model, "kilpisjarvi")
 			"kilpisjarvi_mod"
 		elseif startswith(model, "sonar")
 			"sonar"
+        elseif startswith(model, "prostate")
+            "prostate"
+        elseif startswith(model, "ionosphere")
+            "ionosphere"
 		elseif startswith(model, "mRNA")
 			"mRNA"
 		else
 			error("unknown model $model")
 		end
-		JSON.parse(read(joinpath("data", file_name * ".json"), String))
+		JSON.parse(read(joinpath("icml2025", "data", file_name * ".json"), String))
 	end
 end
 
@@ -220,7 +335,7 @@ function KSess_one_sample(xs, target)
 	end
 	s /= (length(batches) * log(2) * sqrt(π/2))
 	ess2 = T*s^(-2)
-	return T*s^(-2)
+	return ess2
 end
 
 
@@ -250,7 +365,7 @@ function KSess_two_sample(xs, target)
 	end
 	s /= (length(batches) * log(2) * sqrt(π/2))
 	ess2 = T*s^(-2)
-	return T*s^(-2)
+	return ess2
 end
 
 # get the minimum ksess of all margins

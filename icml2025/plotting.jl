@@ -11,7 +11,7 @@ function log_prob_gradient_ratio(model::AbstractString)
     elseif startswith(model, "kilpisjarvi")
         5.956119530847897 # 6.0015265040396
     elseif startswith(model, "funnel100") 
-        65.43722654676135 # 63.34395522158833!!!!!!!!!!!!!
+        5.813058375578914 # 5.791202292981825
     elseif startswith(model, "funnel2")
         5.960239505901212 # 5.916476226247743
     else
@@ -35,6 +35,13 @@ function comparison_plots(df::DataFrame)
     df.minKSess_per_cost = df.minKSess ./ df.cost
 
     sort!(df, :model) # ensure ordering on x-axis
+    # minESS and minKSess just for the reference
+    @df df StatsPlots.groupedboxplot(:model, :miness, group=:explorer, xlabel="Model", ylabel="minESS", 
+        legend=:bottomleft, color=:auto, yaxis=:log10)
+    savefig("icml2025/plots/miness.png")
+    @df df StatsPlots.groupedboxplot(:model, :minKSess, group=:explorer, xlabel="Model", ylabel="min KSESS", 
+        legend=:bottomleft, color=:auto, yaxis=:log10)
+    savefig("icml2025/plots/minKSess.png")
     # Create the grouped boxplot for minESS/sec, minESS/cost, minKSess/sec, minKSess/cost
     @df df StatsPlots.groupedboxplot(:model, :miness_per_sec, group=:explorer, xlabel="Model", ylabel="minESS / sec", 
         legend=:bottomleft, color=:auto, yaxis=:log10)
@@ -59,5 +66,5 @@ function comparison_plots(df::DataFrame)
     savefig("icml2025/plots/accept_rate.png")
 end
 
-df = CSV.read("icml2025/exp_results.csv", DataFrame)
+df = CSV.read("icml2025/exp_results_old.csv", DataFrame)
 comparison_plots(df)

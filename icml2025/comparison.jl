@@ -7,10 +7,11 @@ include("drhmc.jl")
 include("autostep.jl")
 
 models = ["funnel2"]
-seeds = 1:10
-n_rounds = 15
+seeds = [5]
+n_rounds = 16
 exp_results = DataFrame(
     explorer = String[],
+    model = String[],
     mean_1st_dim = Float64[],
     var_1st_dim = Float64[],
     time = Float64[],
