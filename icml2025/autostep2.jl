@@ -1,5 +1,5 @@
 using AdvancedMH, Distributions, MCMCChains, LogDensityProblems, LinearAlgebra
-using CSV, DataFrames, DelimitedFiles, JSON, Turing, Random
+using CSV, DataFrames, DelimitedFiles, JSON, Random
 include("utils.jl")
 
 # using NUTS in Turing.jl
@@ -13,7 +13,7 @@ function autostep2_sample_model(model, seed, n_rounds; max_samples = 2^25, kwarg
     # IVY: you can use
 	# run_sampler(x0, auto_step, f, θ0, target, sqrtdiagMhat, niter)
 	# with f set to either fRWMH or fMALA
-	# target is the logdensity problem
+	# target is the LogDensityProblems.logdensity problem
 	# sqrtdiagMhat is exactly on line 14 of the pseudocode in the paper -- (diag variance of x)^{-1}
 	# niter = number of iterations
 
@@ -50,9 +50,9 @@ function autostep2_sample_model(model, seed, n_rounds; max_samples = 2^25, kwarg
 end
 
 function fMALA(x, z, θ, target, sqrtdiagM)
-	zh = z + θ/2*logdensity_and_gradient(target, x)[2]
+	zh = z + θ/2*LogDensityProblems.logdensity_and_gradient(target, x)[2]
 	xp = x + θ*(zh ./ sqrtdiagM.^2)
-	zp = -(zh + θ/2*logdensity_and_gradient(target, xp)[2])
+	zp = -(zh + θ/2*LogDensityProblems.logdensity_and_gradient(target, xp)[2])
 	return xp, zp
 end
 
@@ -62,7 +62,7 @@ end
 
 function μ(x, z, a, b, θ0, f, target, sqrtdiagM)
     xp, zp = f(x, z, θ0, target, sqrtdiagM)
-	ℓ = logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
+	ℓ = LogDensityProblems.logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - LogDensityProblems.logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
 	cost = 1
 	v = Int(abs(ℓ) < abs(log(b))) - Int(abs(ℓ) > abs(log(a))) 
 	if v == 0
@@ -72,7 +72,7 @@ function μ(x, z, a, b, θ0, f, target, sqrtdiagM)
 	while true
 		j += v
         xp, zp = f(x, z, θ0*(2.)^j, target, sqrtdiagM)
-	    ℓ = logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
+	    ℓ = LogDensityProblems.logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - LogDensityProblems.logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
 	    cost += 1
 		if v > 0 && (abs(ℓ) ≥ abs(log(b)))
 			return j-1, cost
@@ -93,13 +93,13 @@ function auto_step(x, f, θ0, target, sqrtdiagMhat)
 	a = min(a0,b0)
 	b = max(a0,b0)
 	xi = rand() < 0.666 ? rand(0:1) : rand(Beta(1.0,1.0))
-	sqrtdiagM = xi*sqrtdiagMhat + (1-xi)
+	sqrtdiagM = xi*sqrtdiagMhat .+ (1-xi)
 	z = randn(dim) .* sqrtdiagM
 	ηdist, cost1 = η(x,z,a,b,θ0,f,target,sqrtdiagM)
 	θ = rand(ηdist)
 	xp, zp = f(x, z, θ, target, sqrtdiagM)
 	ηpdist, cost2 = η(xp,zp,a,b,θ0,f,target,sqrtdiagM)
-	energyjump = logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
+	energyjump = LogDensityProblems.logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - LogDensityProblems.logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
 	ℓ = energyjump + logpdf(ηpdist, θ) - logpdf(ηdist, θ)
 	cost = 1 + cost1 + cost2
 	if log(rand()) ≤ ℓ 
@@ -112,7 +112,7 @@ end
 function fix_step(x, f, θ0, target, sqrtdiagMhat)
 	z = rand(auxtarget)
 	xp, zp = f(x, z, θ0, target, auxtarget)
-	ℓ = logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
+	ℓ = LogDensityProblems.logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - LogDensityProblems.logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
 	cost = 1
 	if log(rand()) ≤ ℓ
 		return xp, min(0, ℓ), ℓ, cost, θ0
@@ -138,3 +138,6 @@ function run_sampler(x0, kernel, f, θ0, target, sqrtdiagMhat, niter)
 	end
 	return xs, cs, logas, ejumps, thetas
 end
+
+
+#run_sampler([0., 0.], auto_step, fRWMH, 1.0, Funnel(1, 0.6), ones(2), 100)
