@@ -47,7 +47,6 @@ function dr_hmc(n_samples, epsilon, n_leapfrogs, max_proposals, reduction_factor
 		is_accept[i] = accepted
 		log_densities[i] = log_density_q(q)
 	end
-    println("Done!")
 	return samples, log_densities, mean(n_halvings), mean(is_accept), grad_eval, logprob_eval
 end
 
@@ -115,9 +114,9 @@ function drhmc_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwar
     dim = LogDensityProblems.dimension(my_model)
     # initialize DRHMC
     step_size = 0.1      # initial step size
-    n_leapfrogs = 10     # Number of leapfrog steps per proposal(only in DRHMC)
-    k_retries = 10       # Maximum number of retries (delayed rejection)
-    a_factor = 2.0       # Step size reduction factor for retries
+    n_leapfrogs = 5      # Number of leapfrog steps per proposal(only in DRHMC)
+    k_retries = 2        # Maximum number of retries (delayed rejection)
+    a_factor = 5.0       # Step size reduction factor for retries
     M = Diagonal(ones(dim))    # Mass matrix
 
 	Random.seed!(seed)
@@ -141,17 +140,17 @@ function drhmc_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwar
 	end
     samples = [samples[i, :] for i in 1:size(samples, 1)]
 	miness = min_ess_all_methods(samples, model)
-    minKSess = min_KSess(samples, model)
+    # minKSess = min_KSess(samples, model)
 	mean_1st_dim = mean(samples[1])
 	var_1st_dim = var(samples[1])
     energy_jump_dist = mean(abs.(diff(log_densities)))
 	stats_df = DataFrame(
-        explorer = "DRHMC", model = model, 
+        explorer = "DRHMC", model = model, seed = seed, 
 		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0.0, 
         n_logprob = n_logprob, n_steps = n_steps,
-		miness = miness, minKSess = minKSess, acceptance_prob = acceptance_rate, step_size = step_size, 
+		miness = miness, minKSess = 0, acceptance_prob = acceptance_rate, step_size = step_size, 
         n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)
 	return samples, stats_df
 end
 
-#samples, stats_df = drhmc_sample_from_model("funnel2", 1, 10)
+# samples, stats_df = drhmc_sample_from_model("prostate", 1, 10)

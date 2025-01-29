@@ -1,4 +1,4 @@
-# include("../test/activate_test_env.jl")
+include("../test/activate_test_env.jl")
 
 include("adaptiveRWMH.jl")
 include("adaptiveMALA.jl")
@@ -6,12 +6,13 @@ include("nuts.jl")
 include("drhmc.jl")
 include("autostep.jl")
 
-models = ["funnel2"]
-seeds = [5]
-n_rounds = 16
+models = ["prostate", "sonar", "ionosphere"]
+seeds = 1:10
+n_rounds = 15
 exp_results = DataFrame(
     explorer = String[],
     model = String[],
+    seed = Int[], 
     mean_1st_dim = Float64[],
     var_1st_dim = Float64[],
     time = Float64[],
@@ -37,15 +38,15 @@ for model in models
         samples_automala, stats_automala = pt_sample_from_model(model, seed, "AutoStep MALA", n_rounds)
         samples_slicer, stats_slicer = pt_sample_from_model(model, seed, "HitAndRunSlicer", n_rounds)
         # save the samples from the first run
-        if seed == 5
-            CSV.write("icml2025/samples/$(model)_adaptive_rwmh.csv", DataFrame(samples_rwmh, :auto))
-            CSV.write("icml2025/samples/$(model)_adaptive_mala.csv", DataFrame(samples_mala, :auto))
-            CSV.write("icml2025/samples/$(model)_nuts.csv", DataFrame(samples_nuts, :auto))
-            CSV.write("icml2025/samples/$(model)_drhmc.csv", DataFrame(samples_drhmc, :auto))
-            CSV.write("icml2025/samples/$(model)_autorwmh.csv", DataFrame(samples_autorwmh, :auto))
-            CSV.write("icml2025/samples/$(model)_automala.csv", DataFrame(samples_automala, :auto))
-            CSV.write("icml2025/samples/$(model)_slicer.csv", DataFrame(samples_slicer, :auto))
-        end
+        # if seed == 5
+            CSV.write("icml2025/temp/$(seed)_$(model)_adaptive_rwmh.csv", DataFrame(samples_rwmh, :auto))
+            CSV.write("icml2025/temp/$(seed)_$(model)_adaptive_mala.csv", DataFrame(samples_mala, :auto))
+            CSV.write("icml2025/temp/$(seed)_$(model)_nuts.csv", DataFrame(samples_nuts, :auto))
+            CSV.write("icml2025/temp/$(seed)_$(model)_drhmc.csv", DataFrame(samples_drhmc, :auto))
+            CSV.write("icml2025/temp/$(seed)_$(model)_autorwmh.csv", DataFrame(samples_autorwmh, :auto))
+            CSV.write("icml2025/temp/$(seed)_$(model)_automala.csv", DataFrame(samples_automala, :auto))
+            CSV.write("icml2025/temp/$(seed)_$(model)_slicer.csv", DataFrame(samples_slicer, :auto))
+        # end
         # concatenate the dataframe of experiment results
         append!(exp_results, stats_rwmh)
         append!(exp_results, stats_mala)
@@ -55,6 +56,7 @@ for model in models
         append!(exp_results, stats_automala)
         append!(exp_results, stats_slicer)
     end
+    CSV.write("icml2025/exp_results_$model.csv", exp_results)
 end
 
-CSV.write("icml2025/exp_results.csv", exp_results)
+

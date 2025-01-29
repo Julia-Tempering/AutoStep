@@ -55,13 +55,12 @@ struct Kilpisjarvi
     psbeta::Float64
 end
 function LogDensityProblems.logdensity(model::Kilpisjarvi, x)
-    alpha = x[1]
-    beta = x[2]
-    sigma = x[3]
+    alpha, beta, sigma = x
     # priors
     log_prior_alpha = logpdf(Normal(model.pmualpha, model.psalpha), alpha)
     log_prior_beta = logpdf(Normal(model.pmubeta, model.psbeta), beta)
-    log_prior_sigma = logpdf(Normal(0, 1), sigma) - log(ccdf(Normal(0, 1), 0))  # Adjust for truncation
+    log_prior_sigma = logpdf(Truncated(Normal(0, 1), 0, Inf), sigma)
+    # logpdf(Normal(0, 1), sigma) - log(ccdf(Normal(0, 1), 0))  # Adjust for truncation
     # log likelihood
     log_likelihood = sum(logpdf(Normal(alpha + beta * model.x[i], sigma), model.y[i]) for i in 1:model.N)
 
@@ -111,18 +110,18 @@ end
 LogDensityProblems.dimension(model::mRNA) = 5
 LogDensityProblems.capabilities(::mRNA) = LogDensityProblems.LogDensityOrder{0}()
 
-# Define the sonar model
-struct Sonar
+# Define the horseshoe models
+struct Horseshoe
     x::Array
     y::Array
     n::Int
     d::Int
 end
-function LogDensityProblems.logdensity(model::Sonar, x)
-    tau = params[1]  # Global shrinkage parameter
-    lambda = params[2:model.d+1]  # Local shrinkage parameters (vector of length d)
-    beta0 = params[model.d+2]  # Intercept
-    beta = params[model.d+3:end]  # Regression coefficients (vector of length d)
+function LogDensityProblems.logdensity(model::Horseshoe, x)
+    tau = x[1]  # Global shrinkage parameter
+    lambda = x[2:model.d+1]  # Local shrinkage parameters (vector of length d)
+    beta0 = x[model.d+2]  # Intercept
+    beta = x[model.d+3:end]  # Regression coefficients (vector of length d)
     # priors
     log_prior_tau = logpdf(TDist(1), tau)  # Cauchy(0,1) prior for tau
     log_prior_lambda = sum(logpdf(TDist(1), λ) for λ in lambda)  # Cauchy(0,1) priors for lambda
@@ -133,8 +132,8 @@ function LogDensityProblems.logdensity(model::Sonar, x)
 
     return log_prior_tau + log_prior_lambda + log_prior_beta0 + log_prior_beta + log_likelihood
 end
-LogDensityProblems.dimension(model::Sonar) = 3
-LogDensityProblems.capabilities(::Sonar) = LogDensityProblems.LogDensityOrder{0}()
+LogDensityProblems.dimension(model::Horseshoe) = 2*model.d + 2
+LogDensityProblems.capabilities(::Horseshoe) = LogDensityProblems.LogDensityOrder{0}()
 
 # utility function to match models for all kernels
 function logdens_model(model, data)
@@ -145,8 +144,8 @@ function logdens_model(model, data)
         data["psalpha"], data["pmubeta"], data["psbeta"])
     elseif startswith(model, "mRNA")
         return mRNA(data["N"], data["ts"], data["ys"])
-    elseif startswith(model, "sonar")
-        return Sonar(hcat(data["x"]...)', data["y"], data["n"], data["d"])
+    elseif startswith(model, "sonar") || startswith(model, "prostate") || startswith(model, "ionosphere")
+        return Horseshoe(hcat(data["x"]...)', data["y"], data["n"], data["d"])
 	else
 		error("unknown model $model")
 	end

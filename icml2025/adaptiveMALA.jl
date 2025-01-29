@@ -34,16 +34,16 @@ function adaptive_mala_sample_from_model(model, seed, n_rounds; max_samples = 2^
         # initial_params = samples[end]
 	end
     miness = min_ess_all_methods(samples, model)
-    minKSess = min_KSess(samples, model)
+    # minKSess = min_KSess(samples, model)
 	mean_1st_dim = mean(samples[1])
 	var_1st_dim = var(samples[1])
 	acceptance_prob = sum(stat.is_accept for stat in stats) / n_samples
     energy_jump_dist = mean(abs.(diff([stat.log_density for stat in stats])))
 	stats_df = DataFrame(
-        explorer = "adaptive MALA", model = model, 
+        explorer = "adaptive MALA", model = model, seed = seed, 
 		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0.0, 
         n_logprob = n_logprob, n_steps = n_steps,
-		miness = miness, minKSess = minKSess, acceptance_prob = acceptance_prob, step_size = step_size, 
+		miness = miness, minKSess = 0, acceptance_prob = acceptance_prob, step_size = step_size, 
         n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)
 	return samples, stats_df
 end
