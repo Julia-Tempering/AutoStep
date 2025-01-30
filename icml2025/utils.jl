@@ -1,4 +1,4 @@
-using Statistics, StatsBase, LogDensityProblems, DataFrames, CSV
+using Statistics, StatsBase, LogDensityProblems, DataFrames, CSV, ForwardDiff
 using Suppressor, BridgeStan, HypothesisTests, Pigeons
 
 # define orbital model 
@@ -23,7 +23,7 @@ function model_to_target(model)
     if startswith(model, "funnel2")
         return Pigeons.stan_funnel(1, 0.6)
     elseif startswith(model, "funnel100")
-        return Pigeons.stan_funnel(99, 1.5)
+        return Pigeons.stan_funnel(99, 3.0)
     elseif startswith(model, "mRNA")
         stan_example_path(name) = dirname(dirname(pathof(Pigeons))) * "/examples/$name"
         return StanLogPotential(stan_example_path("stan/mRNA.stan"), "icml2025/data/mRNA.json")
@@ -154,7 +154,7 @@ LogDensityProblems.capabilities(::Horseshoe) = LogDensityProblems.LogDensityOrde
 # TODO: Define the orbital model
 
 # Define the function for log density and its gradient
-function logdensity_and_gradient(model::Union{Funnel, mRNA, Kilpisjarvi, Horseshoe}, x)
+function LogDensityProblems.logdensity_and_gradient(model::Union{Funnel, mRNA, Kilpisjarvi, Horseshoe}, x)
     logp = LogDensityProblems.logdensity(model, x)
     grad_logp = ForwardDiff.gradient(z -> LogDensityProblems.logdensity(model, z), x)
     return logp, grad_logp
@@ -429,10 +429,10 @@ function min_KSess(samples, model)
     if startswith(model, "funnel100")
         reference_samples = CSV.read("icml2025/samples/funnel2.csv", DataFrame)
         miness = KSess_two_sample(getindex.(samples, 1), collect(reference_samples[1,:]))
-        ys = collect(reference_samples[2,:])
-        for i in 2:length(samples[1])
-            miness = min(miness, KSess_two_sample(getindex.(samples, i), ys))
-        end
+        #ys = collect(reference_samples[2,:])
+        #for i in 2:length(samples[1])
+        #    miness = min(miness, KSess_two_sample(getindex.(samples, i), ys))
+        #end
         return miness
     else
         miness = Inf
