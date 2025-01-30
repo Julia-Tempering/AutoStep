@@ -3,12 +3,14 @@ include(joinpath(dirname(dirname(pathof(Pigeons))), "test", "supporting", "postd
 stan_example_path(name) = dirname(dirname(pathof(Pigeons))) * "/examples/$name"
 
 pt = pigeons(
+    # TODO: three remaining reference models: mRNA, ionosphere, orbital
     target = StanLogPotential(stan_example_path("stan/mRNA.stan"), "icml2025/data/mRNA.json"),
     #StanLogPotential("icml2025/data/horseshoe_logit.stan", "icml2025/data/ionosphere.json"),
+    #orbital
     variational = GaussianReference(first_tuning_round = 5),
     n_chains_variational = 5,
     record = [traces],
-    n_rounds = 16)
+    n_rounds = 18)
 
 samples = get_sample(pt)
 samples = DataFrame(samples, :auto)
