@@ -1,12 +1,14 @@
 using Pigeons, DataFrames, CSV, BridgeStan
 include(joinpath(dirname(dirname(pathof(Pigeons))), "test", "supporting", "postdb.jl"))
 stan_example_path(name) = dirname(dirname(pathof(Pigeons))) * "/examples/$name"
+include("orbital_model_definition.jl")
+orbital_model = Octofitter.LogDensityModel(GL229A; autodiff=:ForwardDiff, verbosity=4)
 
 pt = pigeons(
     # TODO: three remaining reference models: mRNA, ionosphere, orbital
     target = StanLogPotential(stan_example_path("stan/mRNA.stan"), "icml2025/data/mRNA.json"),
     #StanLogPotential("icml2025/data/horseshoe_logit.stan", "icml2025/data/ionosphere.json"),
-    #orbital
+    #orbital_model
     variational = GaussianReference(first_tuning_round = 5),
     n_chains_variational = 5,
     record = [traces],
