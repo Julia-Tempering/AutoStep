@@ -42,7 +42,7 @@ function autostep2_sample_model(model, seed, explorer, n_rounds, adapt_precond)
 	println("start miness")
 	miness = min_ess_all_methods(samples, model)
 	println("start ksess")
-	minKSess = min_KSess(samples, model)
+	# minKSess = min_KSess(samples, model)
 	println("start acceptance prob")
 	acceptance_prob = mean(exp.(log_accept))
 	energy_jump_dist = mean(ejumps)
@@ -50,7 +50,7 @@ function autostep2_sample_model(model, seed, explorer, n_rounds, adapt_precond)
 		explorer = explorer, model = model, seed = seed,
 		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0.0, n_logprob = n_logprob,
 		n_steps = n_grad_eval, #zero gradient
-		miness = miness, minKSess = minKSess, acceptance_prob = acceptance_prob, step_size = theta0, n_rounds = n_rounds,
+		miness = miness, minKSess = 0.0, acceptance_prob = acceptance_prob, step_size = theta0, n_rounds = n_rounds,
 		energy_jump_dist = energy_jump_dist)
 	println("Done!")
 	return samples, stats_df

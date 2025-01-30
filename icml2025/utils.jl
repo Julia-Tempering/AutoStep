@@ -34,8 +34,7 @@ function model_to_target(model)
 	elseif startswith(model, "prostate")
 		return StanLogPotential("icml2025/data/horseshoe_logit.stan", "icml2025/data/prostate.json")
 	elseif startswith(model, "kilpisjarvi")
-		include(joinpath(dirname(dirname(pathof(Pigeons))), "test", "supporting", "postdb.jl"))
-		return log_potential_from_posterior_db("kilpisjarvi_mod-kilpisjarvi.json")
+		return StanLogPotential("icml2025/data/kilpisjarvi.stan", "icml2025/data/kilpisjarvi_mod.json")
 	elseif startswith(model, "orbital")
 		return orbital_model
 	else
@@ -115,6 +114,10 @@ function LogDensityProblems.logdensity(model::mRNA, x)
 	beta = 10.0^lbeta
 	delta = 10.0^ldelta
 	sigma = 10.0^lsigma
+    # out of range
+    if lt0<=-2 || lt0 >= 1 || lkm0<=-5 || lkm0 >= 5 || lbeta<=-5 || lbeta >= 5 || ldelta<=-5 || ldelta >= 5 || lsigma<=-2 || lsigma >= 2
+        return -Inf
+    end
 	# prior
 	log_prior_lt0 = logpdf(Uniform(-2, 1), lt0)
 	log_prior_lkm0 = logpdf(Uniform(-5, 5), lkm0)

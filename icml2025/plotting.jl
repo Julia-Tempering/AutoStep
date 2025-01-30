@@ -1,4 +1,5 @@
 using StatsPlots, CSV, DataFrames
+using CairoMakie, PairPlots
 
 # ratio of running time of gradient VS log potential
 # computed separately, recording the avg of time_gradient/time_log_prob
@@ -23,6 +24,26 @@ function log_prob_gradient_ratio(model::AbstractString)
 		throw(KeyError(model))
 	end
 end
+
+#=
+generate pair plot, with the reference distribution
+=#
+function draw_pairplot(model, seed, explorer)
+    df = CSV.read("icml2025/temp/$(seed)_$(model)_$(explorer).csv", DataFrame)
+    df = Matrix(df)'
+    df = DataFrame(df, :auto)
+    if explorer == "slicer"
+        df = df[:, 1:12]
+    end
+    p = pairplot(df)
+    save("icml2025/plots/pairplots/pairplot_$(model)_$(explorer).png", p)
+end
+for model in ["orbital"] # 
+    for explorer in ["nuts", "slicer"] #"adaptive_mala", "adaptive_rwmh", "autorwmh", "drhmc", "automala", 
+        draw_pairplot(model, 1, explorer)
+    end
+end
+draw_pairplot("orbital", 10, "automala")
 
 #=
 comparison of all autoMCMC samplers and NUTS; experiment = "post_db"

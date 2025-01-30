@@ -34,3 +34,4 @@ test/draft_test_RWMH.jl
 icml2025/samples
 icml2025/temp
 icml2025/ksess.jl
+icml2025/plots/pairplots
