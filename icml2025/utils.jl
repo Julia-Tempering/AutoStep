@@ -135,6 +135,8 @@ end
 LogDensityProblems.dimension(model::Horseshoe) = 2*model.d + 2
 LogDensityProblems.capabilities(::Horseshoe) = LogDensityProblems.LogDensityOrder{0}()
 
+# TODO: Define the orbital model
+
 # Define the function for log density and its gradient
 function logdensity_and_gradient(model::Union{Funnel, mRNA, Kilpisjarvi, Horseshoe}, x)
     logp = LogDensityProblems.logdensity(model, x)
