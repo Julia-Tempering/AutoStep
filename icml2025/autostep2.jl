@@ -1,5 +1,5 @@
-using AdvancedMH, Distributions, MCMCChains, LogDensityProblems, LinearAlgebra
-using CSV, DataFrames, DelimitedFiles, JSON, Turing, Random
+using Distributions, MCMCChains, LogDensityProblems, LinearAlgebra
+using CSV, DataFrames, DelimitedFiles, JSON, Random
 include("utils.jl")
 
 # using NUTS in Turing.jl
@@ -8,7 +8,11 @@ function autostep2_sample_model(model, seed, n_rounds, explorer)
     my_data = stan_data(model)
     my_model = logdens_model(model, my_data)
     Random.seed!(seed)
-
+	f = if explorer == "AutoStep RWMH"
+		fRWMH
+	elseif explorer == "AutoStep MALA"
+		fMALA
+	end
 
     # IVY: you can use
 	# run_sampler(x0, auto_step, f, θ0, target, sqrtdiagMhat, niter)
@@ -97,7 +101,7 @@ function auto_step(x, f, θ0, target, sqrtdiagMhat)
 	a = min(a0,b0)
 	b = max(a0,b0)
 	xi = rand() < 0.666 ? rand(0:1) : rand(Beta(1.0,1.0))
-	sqrtdiagM = xi*sqrtdiagMhat + (1-xi)
+	sqrtdiagM = xi .*sqrtdiagMhat .+ (1-xi)
 	z = randn(dim) .* sqrtdiagM
 	ηdist, cost1 = η(x,z,a,b,θ0,f,target,sqrtdiagM)
 	θ = rand(ηdist)
