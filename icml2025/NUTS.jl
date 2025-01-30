@@ -28,7 +28,7 @@ function nuts_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwarg
 	samples = [vec(sample) for sample in samples] # convert to vectors
 	samples = [collect(row) for row in eachrow(hcat(samples...))] # convert to format compatible with min_ess_all_methods
 	miness = min_ess_all_methods(samples, model)
-    # minKSess = min_KSess(samples, model)
+    minKSess = min_KSess(samples, model)
 	mean_1st_dim = mean(samples[1])
 	var_1st_dim = var(samples[1])
 	acceptance_prob = mean(chain[:acceptance_rate])
@@ -38,7 +38,7 @@ function nuts_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwarg
         explorer = "NUTS", model = model, seed = seed, 
 		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0.0, 
         n_logprob = n_logprob, n_steps = n_steps,
-		miness = miness, minKSess = 0, acceptance_prob = acceptance_prob, step_size = step_size, 
+		miness = miness, minKSess = minKSess, acceptance_prob = acceptance_prob, step_size = step_size, 
         n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)
 	return samples, stats_df
 end
