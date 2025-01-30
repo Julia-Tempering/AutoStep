@@ -1,6 +1,22 @@
 using Statistics, StatsBase, LogDensityProblems, DataFrames, CSV, ForwardDiff
 using Suppressor, BridgeStan, HypothesisTests, Pigeons
 
+# define orbital model 
+include("orbital_model_definition.jl")
+orbital_model = Octofitter.LogDensityModel(GL229A; autodiff=:ForwardDiff, verbosity=4)
+""" 
+Notes for Ivy: 
+
+Octofitter's LogDensityModel already also conforms to the LogDensityProblems interface.
+However, please not that you may need to post-transform samples to get them to 
+look like on the Pigeons GitHub issue link.  
+--- See `model.link` or `model.invlink`. in the Octofitter documentation for more information
+E.g., William has already defined for us: 
+    LogDensityProblems.logdensity(p::LogDensityModel, θ) = p.ℓπcallback(θ)
+    LogDensityProblems.logdensity_and_gradient(p::LogDensityModel, θ) = p.∇ℓπcallback(θ)
+    LogDensityProblems.dimension(p::LogDensityModel{D}) where D = D
+    LogDensityProblems.capabilities(::Type{<:LogDensityModel}) = LogDensityProblems.LogDensityOrder{1}()
+"""
 
 # convert model to pigeon-digestable model
 function model_to_target(model)
@@ -21,7 +37,7 @@ function model_to_target(model)
         include(joinpath(dirname(dirname(pathof(Pigeons))), "test", "supporting", "postdb.jl"))
         return log_potential_from_posterior_db("kilpisjarvi_mod-kilpisjarvi.json")
     elseif startswith(model, "orbital")
-        # TODO: orbital
+        return orbital_model 
     else
 		error("unknown model $model")
     end
