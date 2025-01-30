@@ -7,7 +7,7 @@ include("autostep2.jl")
 
 models = ["funnel100"]
 seeds = [1]
-n_rounds = 14
+n_rounds = 15
 exp_results = DataFrame(
     explorer = String[],
     model = String[],

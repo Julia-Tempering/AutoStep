@@ -7,7 +7,7 @@ function model_to_target(model)
     if startswith(model, "funnel2")
         return Pigeons.stan_funnel(1, 0.6)
     elseif startswith(model, "funnel100")
-        return Pigeons.stan_funnel(99, 3.0)
+        return Pigeons.stan_funnel(99, 10.0)
     elseif startswith(model, "mRNA")
         stan_example_path(name) = dirname(dirname(pathof(Pigeons))) * "/examples/$name"
         return StanLogPotential(stan_example_path("stan/mRNA.stan"), "icml2025/data/mRNA.json")
@@ -164,7 +164,7 @@ function stan_data(model::String; dataset = nothing, dim = nothing, scale = noth
 	if startswith(model, "funnel2")
 		Dict("dim" => 1, "scale" => 0.3)
 	elseif startswith(model, "funnel100")
-		Dict("dim" => 99, "scale" => 0.5)
+		Dict("dim" => 99, "scale" => 10.0)
 	else
 		file_name = if startswith(model, "kilpisjarvi")
 			"kilpisjarvi_mod"
