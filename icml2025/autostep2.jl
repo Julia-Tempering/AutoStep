@@ -1,9 +1,9 @@
 using AdvancedMH, Distributions, MCMCChains, LogDensityProblems, LinearAlgebra
-using CSV, DataFrames, DelimitedFiles, JSON, Random
+using CSV, DataFrames, DelimitedFiles, JSON, Turing, Random
 include("utils.jl")
 
 # using NUTS in Turing.jl
-function autostep2_sample_model(model, seed, n_rounds; max_samples = 2^25, kwargs...)
+function autostep2_sample_model(model, seed, n_rounds, explorer)
     # make model and data from the arguments
     my_data = stan_data(model)
     my_model = logdens_model(model, my_data)
@@ -13,7 +13,7 @@ function autostep2_sample_model(model, seed, n_rounds; max_samples = 2^25, kwarg
     # IVY: you can use
 	# run_sampler(x0, auto_step, f, θ0, target, sqrtdiagMhat, niter)
 	# with f set to either fRWMH or fMALA
-	# target is the LogDensityProblems.logdensity problem
+	# target is the logdensity problem
 	# sqrtdiagMhat is exactly on line 14 of the pseudocode in the paper -- (diag variance of x)^{-1}
 	# niter = number of iterations
 
@@ -21,30 +21,34 @@ function autostep2_sample_model(model, seed, n_rounds; max_samples = 2^25, kwarg
     n_logprob = 0
     miness = my_time = 0.0
     n_samples = 2
-    initial_params = nothing
-    local chain
+	sqrtdiagMhat = ones(LogDensityProblems.dimension(my_model))
+	initial_params = zeros(LogDensityProblems.dimension(my_model))
+	theta0 = 1.0
+    local log_accept
     local samples
+	local ejumps
     for i in 1:n_rounds
         n_samples = 2^i
-        my_time += @elapsed chain = sample(my_model, RobustAdaptiveMetropolis(), n_samples; 
-            chain_type = Chains, initial_params = initial_params, progress = true)
-        n_logprob += 2*n_samples # 2 logprob evaluations: one for the proposal, one for the current state
-        initial_params = vec(Array(chain[end, :, :]))
+        my_time += @elapsed samples, costs, log_accept, ejumps, thetas = run_sampler(initial_params, auto_step, f, theta0, 
+			my_model, sqrtdiagMhat, n_samples)
+		theta0 = median(thetas)
+		sqrtdiagMhat = vec(1.0 ./ var(samples, dims=1))
+		n_logprob += costs[end]
+		println(my_time)
+        initial_params = samples[end, :]
     end
-    samples = [chain[param] for param in names(chain)[1:end-1]] # discard aux vars
-    samples = [vec(sample) for sample in samples] # convert to vectors
-    samples = [collect(row) for row in eachrow(hcat(samples...))] # convert to format compatible with min_ess_all_methods
+	mean_1st_dim = mean(samples[:, 1])
+    var_1st_dim = var(samples[:, 1])
+    samples = [samples[i, :] for i in 1:size(samples, 1)]
     miness = min_ess_all_methods(samples, model)
-    # minKSess = min_KSess(samples, model)
-    mean_1st_dim = mean(samples[1])
-    var_1st_dim = var(samples[1])
+    minKSess = min_KSess(samples, model)
     acceptance_prob = sum(1 for i in 2:n_samples if samples[i] != samples[i-1]; init=0)/(n_samples - 1)
-    energy_jump_dist = mean(abs.(diff(chain[:lp], dims=1)))
+    energy_jump_dist = mean(ejumps)
     stats_df = DataFrame(
-        explorer = "adaptive RWMH", model = model, seed = seed, 
+        explorer = explorer, model = model, seed = seed, 
         mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time=my_time, jitter_std = 0.0, n_logprob = n_logprob, 
         n_steps=0, #zero gradient
-        miness=miness, minKSess = 0, acceptance_prob=acceptance_prob, step_size=0.0, n_rounds = n_rounds, 
+        miness=miness, minKSess = minKSess, acceptance_prob=acceptance_prob, step_size=0.0, n_rounds = n_rounds, 
         energy_jump_dist = energy_jump_dist)
     return samples, stats_df
 end
@@ -93,7 +97,7 @@ function auto_step(x, f, θ0, target, sqrtdiagMhat)
 	a = min(a0,b0)
 	b = max(a0,b0)
 	xi = rand() < 0.666 ? rand(0:1) : rand(Beta(1.0,1.0))
-	sqrtdiagM = xi*sqrtdiagMhat .+ (1-xi)
+	sqrtdiagM = xi*sqrtdiagMhat + (1-xi)
 	z = randn(dim) .* sqrtdiagM
 	ηdist, cost1 = η(x,z,a,b,θ0,f,target,sqrtdiagM)
 	θ = rand(ηdist)
@@ -141,3 +145,6 @@ end
 
 
 #run_sampler([0., 0.], auto_step, fRWMH, 1.0, Funnel(1, 0.6), ones(2), 100)
+
+samples, stats_df = autostep2_sample_model("funnel2", 1, 15, "AutoStep RWMH")
+print(stats_df)
