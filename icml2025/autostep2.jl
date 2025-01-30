@@ -14,14 +14,6 @@ function autostep2_sample_model(model, seed, explorer, n_rounds, adapt_precond)
 		fMALA
 	end
 
-	# IVY: you can use
-	# run_sampler(x0, auto_step, f, θ0, target, sqrtdiagMhat, niter)
-	# with f set to either fRWMH or fMALA
-	# target is the logdensity problem
-	# sqrtdiagMhat is exactly on line 14 of the pseudocode in the paper -- (diag variance of x)^{-1}
-	# niter = number of iterations
-
-	# run until minESS threshold is reached
 	n_logprob = n_grad_eval = 0
 	miness = my_time = 0.0
 	n_samples = 2
@@ -47,9 +39,12 @@ function autostep2_sample_model(model, seed, explorer, n_rounds, adapt_precond)
 	mean_1st_dim = mean(samples[:, 1])
 	var_1st_dim = var(samples[:, 1])
 	samples = [samples[i, :] for i in 1:size(samples, 1)]
+	println("start miness")
 	miness = min_ess_all_methods(samples, model)
+	println("start ksess")
 	minKSess = min_KSess(samples, model)
-	acceptance_prob = sum(1 for i in 2:n_samples if samples[i] != samples[i-1]; init = 0) / (n_samples - 1)
+	println("start acceptance prob")
+	acceptance_prob = mean(exp.(log_accept))
 	energy_jump_dist = mean(ejumps)
 	stats_df = DataFrame(
 		explorer = explorer, model = model, seed = seed,
@@ -57,18 +52,15 @@ function autostep2_sample_model(model, seed, explorer, n_rounds, adapt_precond)
 		n_steps = n_grad_eval, #zero gradient
 		miness = miness, minKSess = minKSess, acceptance_prob = acceptance_prob, step_size = theta0, n_rounds = n_rounds,
 		energy_jump_dist = energy_jump_dist)
+	println("Done!")
 	return samples, stats_df
 end
 
 function fMALA(x, z, θ, target, sqrtdiagM)
-	try
-		zh = z + θ / 2 * LogDensityProblems.logdensity_and_gradient(target, x)[2]
-		xp = x + θ * (zh ./ sqrtdiagM .^ 2)
-		zp = -(zh + θ / 2 * LogDensityProblems.logdensity_and_gradient(target, xp)[2])
-		return xp, zp, 2
-	catch e
-		return x, z, 2
-	end
+	zh = z + θ / 2 * LogDensityProblems.logdensity_and_gradient(target, x)[2]
+	xp = x + θ * (zh ./ sqrtdiagM .^ 2)
+	zp = -(zh + θ / 2 * LogDensityProblems.logdensity_and_gradient(target, xp)[2])
+	return xp, zp, 2
 end
 
 function fRWMH(x, z, θ, target, sqrtdiagM)
@@ -80,11 +72,11 @@ function μ(x, z, a, b, θ0, f, target, sqrtdiagM)
 	ℓ = try
 		LogDensityProblems.logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - LogDensityProblems.logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
 	catch e
-		-Inf
+		NaN
 	end
 	cost = 1
 	v = Int(abs(ℓ) < abs(log(b))) - Int(abs(ℓ) > abs(log(a)))
-	if v == 0 || ℓ == -Inf
+	if v == 0 || isnan(ℓ)
 		return 0, cost, grad_eval
 	end
 	j = 0
@@ -95,10 +87,10 @@ function μ(x, z, a, b, θ0, f, target, sqrtdiagM)
 		ℓ = try
 			LogDensityProblems.logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - LogDensityProblems.logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
 		catch e
-			-Inf
+			NaN
 		end
 		cost += 1
-		if ℓ == -Inf
+		if isnan(ℓ) || ℓ == 0.0
 			return 0, cost, grad_eval
 		elseif v > 0 && (abs(ℓ) ≥ abs(log(b)))
 			return j - 1, cost, grad_eval
@@ -125,7 +117,7 @@ function auto_step(x, f, θ0, target, sqrtdiagMhat)
 	θ = rand(ηdist)
 	xp, zp, grad_eval2 = f(x, z, θ, target, sqrtdiagM)
 	ηpdist, cost2, grad_eval3 = η(xp, zp, a, b, θ0, f, target, sqrtdiagM)
-	energyjump = try 
+	energyjump = try
 		LogDensityProblems.logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - LogDensityProblems.logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
 	catch e
 		-Inf
@@ -173,7 +165,7 @@ function run_sampler(x0, kernel, f, θ0, target, sqrtdiagMhat, niter)
 end
 
 
-#run_sampler([0., 0.], auto_step, fRWMH, 1.0, Funnel(1, 0.6), ones(2), 100)
+# run_sampler(zeros(100), auto_step, fMALA, 1.0, Funnel(99, 2.0), ones(100), 100)
 
-# samples, stats_df = autostep2_sample_model("funnel100", 1, 15, "AutoStep RWMH", false)
+# samples, stats_df = autostep2_sample_model("funnel100", 1, "AutoStep MALA", 15, false)
 # print(stats_df)
