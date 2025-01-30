@@ -7,7 +7,7 @@ function model_to_target(model)
     if startswith(model, "funnel2")
         return Pigeons.stan_funnel(1, 0.6)
     elseif startswith(model, "funnel100")
-        return Pigeons.stan_funnel(99, 0.6)
+        return Pigeons.stan_funnel(99, 1.5)
     elseif startswith(model, "mRNA")
         stan_example_path(name) = dirname(dirname(pathof(Pigeons))) * "/examples/$name"
         return StanLogPotential(stan_example_path("stan/mRNA.stan"), "icml2025/data/mRNA.json")
