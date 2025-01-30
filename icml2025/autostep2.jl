@@ -119,7 +119,7 @@ end
 
 function fix_step(x, f, θ0, target, sqrtdiagMhat)
 	z = rand(auxtarget)
-	xp, zp = f(x, z, θ0, target, auxtarget)
+	xp, zp = f(x, z, θ0, target, sqrtdiagM)
 	ℓ = LogDensityProblems.logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - LogDensityProblems.logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
 	cost = 1
 	if log(rand()) ≤ ℓ
