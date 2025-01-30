@@ -1,5 +1,5 @@
 using Statistics, StatsBase, LogDensityProblems, DataFrames, CSV, ForwardDiff
-using Suppressor, BridgeStan, HypothesisTests, Pigeons
+using Suppressor, BridgeStan, HypothesisTests, Pigeons, JSON, LinearAlgebra
 
 # define orbital model 
 include("orbital_model_definition.jl")
@@ -49,12 +49,11 @@ struct Funnel
 	scale::Float64
 end
 function LogDensityProblems.logdensity(model::Funnel, x)
-	dim = LogDensityProblems.dimension(model)
-	# Ensure x has the correct dimensions.
-	if length(x) != dim
-		return -Inf
-	end
-	return logpdf(Normal(0, 3), x[1]) + sum(logpdf.(Normal(0, exp(x[1] / model.scale)), x[2:end]))
+	try
+        return logpdf(Normal(0, 3), x[1]) + sum(logpdf.(Normal(0, exp(x[1] / model.scale)), x[2:end]))
+    catch e 
+        return -Inf
+    end
 end
 LogDensityProblems.dimension(model::Funnel) = model.dim + 1
 LogDensityProblems.capabilities(::Funnel) = LogDensityProblems.LogDensityOrder{0}()

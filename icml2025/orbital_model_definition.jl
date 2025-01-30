@@ -1,3 +1,5 @@
+# using Pkg
+# Pkg.add(PackageSpec(name="Octofitter", version="4.0.0"))
 using Dates, Octofitter, Distributions
 
 # Old measurements from Brandt 2020 
