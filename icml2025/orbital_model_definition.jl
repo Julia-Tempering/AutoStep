@@ -1,4 +1,4 @@
-using Dates, Octofitter
+using Dates, Octofitter, Distributions
 
 # Old measurements from Brandt 2020 
 # The Astronomical Journal, 160:196 (15pp), 2020 October

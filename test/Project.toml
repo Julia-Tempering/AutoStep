@@ -1,5 +1,6 @@
 [deps]
 AlgebraOfGraphics = "cbdf2221-f076-402e-a563-3d30da359d67"
+AutoStep = "9c7125eb-1c93-4483-8569-ec7e9755e655"
 Bijectors = "76274a88-744f-5084-9051-94815aaf08c4"
 BridgeStan = "c88b6f0a-829e-4b0b-94b7-f06ab5908f5a"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
@@ -22,4 +23,6 @@ SplittableRandoms = "8efc31e9-3fb0-4277-b18c-5a3d5d07abad"
 StatsFuns = "4c63d2b9-4356-54db-8cca-17b64c39e42c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 ZipFile = "a5390f91-8eb1-5f08-bee0-b1d1ffed6cea"
-AutoStep = "9c7125eb-1c93-4483-8569-ec7e9755e655"
+
+[extras]
+ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"

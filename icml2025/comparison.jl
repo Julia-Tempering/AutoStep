@@ -6,7 +6,7 @@ include("autostep.jl")
 include("autostep2.jl")
 
 models = ["funnel100"]
-seeds = [1]
+seeds = 1:10
 n_rounds = 15
 exp_results = DataFrame(
     explorer = String[],
@@ -42,11 +42,11 @@ for model in models
         stats_automala_precond = nothing
         GC.gc() =#
 
-        samples_autorwmh, stats_autorwmh = autostep2_sample_model(model, seed, "AutoStep RWMH", n_rounds, false)
-        CSV.write("icml2025/temp/$(seed)_$(model)_autorwmh.csv", DataFrame(samples_autorwmh, :auto))
-        append!(exp_results, stats_autorwmh)
-        samples_autorwmh = nothing
-        print(stats_autorwmh)
+        # samples_autorwmh, stats_autorwmh = autostep2_sample_model(model, seed, "AutoStep RWMH", n_rounds, false)
+        # CSV.write("icml2025/temp/$(seed)_$(model)_autorwmh.csv", DataFrame(samples_autorwmh, :auto))
+        # append!(exp_results, stats_autorwmh)
+        # samples_autorwmh = nothing
+        # print(stats_autorwmh)
 
         samples_automala, stats_automala = autostep2_sample_model(model, seed, "AutoStep MALA", n_rounds, false)
         CSV.write("icml2025/temp/$(seed)_$(model)_automala.csv", DataFrame(samples_automala, :auto))
@@ -54,17 +54,23 @@ for model in models
         samples_automala = nothing
         print(stats_automala)
 
-        samples_rwmh, stats_rwmh = adaptive_rwmh_sample_from_model(model, seed, n_rounds)
-        CSV.write("icml2025/temp/$(seed)_$(model)_adaptive_rwmh.csv", DataFrame(samples_rwmh, :auto))
-        append!(exp_results, stats_rwmh)
-        samples_rwmh = nothing
-        print(stats_rwmh)
+        # samples_rwmh, stats_rwmh = adaptive_rwmh_sample_from_model(model, seed, n_rounds)
+        # CSV.write("icml2025/temp/$(seed)_$(model)_adaptive_rwmh.csv", DataFrame(samples_rwmh, :auto))
+        # append!(exp_results, stats_rwmh)
+        # samples_rwmh = nothing
+        # print(stats_rwmh)
 
         samples_mala, stats_mala = adaptive_mala_sample_from_model(model, seed, n_rounds)
         CSV.write("icml2025/temp/$(seed)_$(model)_adaptive_mala.csv", DataFrame(samples_mala, :auto))
         append!(exp_results, stats_mala)
         samples_mala = nothing
         print(stats_mala)
+
+        # samples_slicer, stats_slicer = pt_sample_from_model(model, seed, "HitAndRunSlicer", n_rounds)
+        # CSV.write("icml2025/temp/$(seed)_$(model)_slicer.csv", DataFrame(samples_slicer, :auto))
+        # append!(exp_results, stats_slicer)
+        # samples_slicer = nothing
+        # print(stats_slicer)
 
         samples_nuts, stats_nuts = nuts_sample_from_model(model, seed, n_rounds)
         CSV.write("icml2025/temp/$(seed)_$(model)_nuts.csv", DataFrame(samples_nuts, :auto))
@@ -73,19 +79,13 @@ for model in models
         print(stats_nuts)
 
         println("Current at seed $seed")
-        # samples_drhmc, stats_drhmc = drhmc_sample_from_model(model, seed, n_rounds)
-        # CSV.write("icml2025/temp/$(seed)_$(model)_drhmc.csv", DataFrame(samples_drhmc, :auto))
-        # append!(exp_results, stats_drhmc)
-        # samples_drhmc = nothing
-        # print(stats_drhmc)
-
-        # samples_slicer, stats_slicer = pt_sample_from_model(model, seed, "HitAndRunSlicer", n_rounds)
-        # CSV.write("icml2025/temp/$(seed)_$(model)_slicer.csv", DataFrame(samples_slicer, :auto))
-        # append!(exp_results, stats_slicer)
-        # samples_slicer = nothing
-        # print(stats_slicer)
+        samples_drhmc, stats_drhmc = drhmc_sample_from_model(model, seed, n_rounds)
+        CSV.write("icml2025/temp/$(seed)_$(model)_drhmc.csv", DataFrame(samples_drhmc, :auto))
+        append!(exp_results, stats_drhmc)
+        samples_drhmc = nothing
+        print(stats_drhmc)
     end
-    CSV.write("icml2025/exp_results.csv", exp_results)
+    CSV.write("icml2025/exp_results_$(model).csv", exp_results)
 end
 
 
