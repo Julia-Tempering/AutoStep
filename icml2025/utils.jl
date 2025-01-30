@@ -135,6 +135,13 @@ end
 LogDensityProblems.dimension(model::Horseshoe) = 2*model.d + 2
 LogDensityProblems.capabilities(::Horseshoe) = LogDensityProblems.LogDensityOrder{0}()
 
+# Define the function for log density and its gradient
+function logdensity_and_gradient(model::Union{Funnel, mRNA, Kilpisjarvi, Horseshoe}, x)
+    logp = LogDensityProblems.logdensity(model, x)
+    grad_logp = ForwardDiff.gradient(z -> LogDensityProblems.logdensity(model, z), x)
+    return logp, grad_logp
+end
+
 # utility function to match models for all kernels
 function logdens_model(model, data)
 	if startswith(model, "funnel")
