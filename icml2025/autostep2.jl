@@ -36,7 +36,7 @@ function autostep2_sample_model(model, seed, n_rounds, explorer)
         my_time += @elapsed samples, costs, log_accept, ejumps, thetas = run_sampler(initial_params, auto_step, f, theta0, 
 			my_model, sqrtdiagMhat, n_samples)
 		theta0 = median(thetas)
-		sqrtdiagMhat = vec(1.0 ./ var(samples, dims=1))
+		sqrtdiagMhat = vec(1.0 ./ std(samples, dims=1))
 		n_logprob += costs[end]
 		println(my_time)
         initial_params = samples[end, :]
@@ -65,7 +65,7 @@ function fMALA(x, z, θ, target, sqrtdiagM)
 end
 
 function fRWMH(x, z, θ, target, sqrtdiagM)
-	return x+θ*z, -z
+	return x+θ*(z ./ sqrtdiagM.^2), -z
 end
 
 function μ(x, z, a, b, θ0, f, target, sqrtdiagM)
@@ -150,5 +150,5 @@ end
 
 #run_sampler([0., 0.], auto_step, fRWMH, 1.0, Funnel(1, 0.6), ones(2), 100)
 
-samples, stats_df = autostep2_sample_model("funnel2", 3, 16, "AutoStep RWMH")
+samples, stats_df = autostep2_sample_model("funnel2", 4, 16, "AutoStep RWMH")
 print(stats_df)
