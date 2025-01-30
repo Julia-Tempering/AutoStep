@@ -52,7 +52,7 @@ function autostep2_sample_model(model, seed, n_rounds, explorer)
         explorer = explorer, model = model, seed = seed, 
         mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time=my_time, jitter_std = 0.0, n_logprob = n_logprob, 
         n_steps=0, #zero gradient
-        miness=miness, minKSess = minKSess, acceptance_prob=acceptance_prob, step_size=0.0, n_rounds = n_rounds, 
+        miness=miness, minKSess = minKSess, acceptance_prob=acceptance_prob, step_size=theta0, n_rounds = n_rounds, 
         energy_jump_dist = energy_jump_dist)
     return samples, stats_df
 end
@@ -150,5 +150,5 @@ end
 
 #run_sampler([0., 0.], auto_step, fRWMH, 1.0, Funnel(1, 0.6), ones(2), 100)
 
-samples, stats_df = autostep2_sample_model("funnel2", 1, 15, "AutoStep RWMH")
+samples, stats_df = autostep2_sample_model("funnel2", 3, 16, "AutoStep RWMH")
 print(stats_df)
