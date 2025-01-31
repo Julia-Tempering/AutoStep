@@ -140,7 +140,7 @@ function drhmc_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwar
 	end
     samples = [samples[i, :] for i in 1:size(samples, 1)]
 	miness = min_ess_all_methods(samples, model)
-    minKSess = min_KSess(samples, model)
+    # minKSess = min_KSess(samples, model)
 	mean_1st_dim = mean(samples[1])
 	var_1st_dim = var(samples[1])
     energy_jump_dist = mean(abs.(diff(log_densities)))
@@ -148,7 +148,7 @@ function drhmc_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwar
         explorer = "DRHMC", model = model, seed = seed, 
 		mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time = my_time, jitter_std = 0.0, 
         n_logprob = n_logprob, n_steps = n_steps,
-		miness = miness, minKSess = minKSess, acceptance_prob = acceptance_rate, step_size = step_size, 
+		miness = miness, minKSess = 0.0, acceptance_prob = acceptance_rate, step_size = step_size, 
         n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)
 	return samples, stats_df
 end
