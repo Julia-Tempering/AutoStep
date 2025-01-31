@@ -29,19 +29,18 @@ end
 generate pair plot, with the reference distribution
 =#
 function draw_pairplot(model, seed, explorer)
-    df = CSV.read("icml2025/temp/$(seed)_$(model)_$(explorer).csv", DataFrame)
-    df = Matrix(df)'
-    df = DataFrame(df, :auto)
-    df = df[:, vcat(1:5, 96:100)] # modify this for difference models
-    p = pairplot(df)
-    save("icml2025/plots/pairplots/pairplot_$(model)_$(explorer).png", p)
+	df = CSV.read("icml2025/temp/$(seed)_$(model)_$(explorer).csv", DataFrame)
+	df = Matrix(df)'
+	df = DataFrame(df, :auto)
+	df = df[:, vcat(1:5, 96:100)] # modify this for difference models
+	p = pairplot(df)
+	save("icml2025/plots/pairplots/pairplot_$(model)_$(explorer).png", p)
 end
-for model in ["prostate"] # 
-    for explorer in ["adaptive_rwmh", "nuts", "slicer"] #"adaptive_mala", "automala", "drhmc", "autorwmh", 
-        draw_pairplot(model, 1, explorer)
-    end
-end
-draw_pairplot("prostate", 10, "autorwmh")
+# for model in ["prostate"] # 
+#     for explorer in ["adaptive_rwmh", "nuts", "slicer"] #"adaptive_mala", "automala", "drhmc", "autorwmh", 
+#         draw_pairplot(model, 1, explorer)
+#     end
+# end
 
 #=
 comparison of all autoMCMC samplers and NUTS; experiment = "post_db"
@@ -53,45 +52,62 @@ function comparison_plots(df::DataFrame)
 		df.n_logprob,  # non gradient-based samplers
 		df.n_logprob .+ 2 * df.n_steps .* log_prob_gradient_ratio.(df.model), # 1 leapfrog = 2 gradient eval
 	) # gradient based: we use cost = #log_potential_eval + eta * #gradient_eval, where eta is model dependent
+	df = filter(row -> !(row.explorer == "AutoStep RWMH (precond)" || row.explorer == "AutoStep MALA (precond)"), df)
 	df_filtered = filter(row -> !isnan(row.miness), df) # need to remove NaN
 	df_filtered.miness_per_sec = df_filtered.miness ./ df_filtered.time
 	df_filtered.miness_per_cost = df_filtered.miness ./ df_filtered.cost
 	df.minKSess_per_sec = df.minKSess ./ df.time
 
+	default(
+		xguidefontsize = 14,  # X-axis label font size
+		yguidefontsize = 14,  # Y-axis label font size
+		xtickfontsize = 12,
+		ytickfontsize = 12,
+		legendfontsize = 12,
+		size = (1000, 700),
+	)
+
 	sort!(df, :model) # ensure ordering on x-axis
 	# minESS and minKSess just for the reference
 	@df df_filtered StatsPlots.groupedboxplot(:model, :miness, group = :explorer, xlabel = "Model", ylabel = "minESS",
-		legend = :bottomleft, color = :auto, yaxis = :log10)
+		legend = :bottomleft, color = :auto, yaxis = :log10, margin = 3Plots.mm,
+		yticks = [10.0^(-6), 10.0^(-4), 10.0^(-2), 10.0^(-0), 10.0^2])
 	savefig("icml2025/plots/miness.png")
 	@df df StatsPlots.groupedboxplot(:model, :minKSess, group = :explorer, xlabel = "Model", ylabel = "min KSESS",
-		legend = :bottomleft, color = :auto, yaxis = :log10)
+		legend = :topright, color = :auto, yaxis = :log10, margin = 3Plots.mm,
+		yticks = [10.0^0, 10.0^1, 10.0^2, 10.0^3])
 	savefig("icml2025/plots/minKSess.png")
+
 	# Create the grouped boxplot for minESS/sec, minESS/cost, minKSess/sec, minKSess/cost
 	@df df_filtered StatsPlots.groupedboxplot(:model, :miness_per_sec, group = :explorer, xlabel = "Model", ylabel = "minESS / sec",
-		legend = :bottomleft, color = :auto, yaxis = :log10)
+		legend = :bottomleft, color = :auto, yaxis = :log10, margin = 3Plots.mm,
+		yticks = [10.0^(-8), 10.0^(-6), 10.0^(-4), 10.0^(-2), 10.0^(-0), 10.0^2])
 	savefig("icml2025/plots/miness_per_sec.png")
 	@df df_filtered StatsPlots.groupedboxplot(:model, :miness_per_cost, group = :explorer, xlabel = "Model", ylabel = "minESS / cost",
-		legend = :bottomleft, color = :auto, yaxis = :log10)
+		legend = :bottomleft, color = :auto, yaxis = :log10, margin = 3Plots.mm,
+		yticks = [10.0^(-14), 10.0^(-12), 10.0^(-10), 10.0^(-8), 10.0^(-6), 10.0^(-4)])
 	savefig("icml2025/plots/miness_per_cost.png")
 	@df df StatsPlots.groupedboxplot(:model, :minKSess_per_sec, group = :explorer, xlabel = "Model", ylabel = "min KSESS / sec",
-		legend = :bottomleft, color = :auto, yaxis = :log10)
+		legend = :topright, color = :auto, yaxis = :log10, margin = 3Plots.mm)
 	savefig("icml2025/plots/minKSess_per_sec.png")
 
-    df_filtered_no_cost = filter(row -> !(row.cost == 0), df) # need to remove 0 cost (alg fails)
+	df_filtered_no_cost = filter(row -> !(row.cost == 0), df) # need to remove 0 cost (alg fails)
 	df_filtered_no_cost.minKSess_per_cost = df_filtered_no_cost.minKSess ./ df_filtered_no_cost.cost
-	@df df_filtered_no_cost StatsPlots.groupedboxplot(:model, :minKSess_per_cost, group = :explorer, xlabel = "Model", ylabel = "min KSESS / cost",
-		legend = :bottomleft, color = :auto, yaxis = :log10)
+	@df df_filtered_no_cost StatsPlots.groupedboxplot(:model, :minKSess_per_cost, group = :explorer, xlabel = "Model",
+		ylabel = "min KSESS / cost", legend = :topright, color = :auto, yaxis = :log10, margin = 3Plots.mm)
 	savefig("icml2025/plots/minKSess_per_cost.png")
 
 	# the energy jump plot
-    df_filtered_no_energy = filter(row -> !(row.energy_jump_dist == 0 || isnan(row.energy_jump_dist) || !isfinite(row.energy_jump_dist)), df) # need to remove 0 cost (alg fails)
+	df_filtered_no_energy = filter(row -> !(row.energy_jump_dist == 0 || isnan(row.energy_jump_dist) || !isfinite(row.energy_jump_dist)), df) # need to remove 0 cost (alg fails)
 	@df df_filtered_no_energy StatsPlots.groupedboxplot(:model, :energy_jump_dist, group = :explorer, xlabel = "Model",
-		ylabel = "Average Energy Jump Distance", legend = :topleft, color = :auto) # , ylim = (-0.03, 0.8)
+		ylabel = "Average Energy Jump Distance", legend = :topleft, color = :auto, ylim = (0, 32.0),
+		margin = 3Plots.mm, yticks = [0, 10, 20, 30])
 	savefig("icml2025/plots/energy_jump.png")
 	# the acceptance rate plot
-    df_filtered_no_ac = filter(row -> !(isnan(row.acceptance_prob)), df) # need to remove 0 cost (alg fails)
+	df_filtered_no_ac = filter(row -> !(isnan(row.acceptance_prob)), df) # need to remove 0 cost (alg fails)
 	@df df_filtered_no_ac StatsPlots.groupedboxplot(:model, :acceptance_prob, group = :explorer, xlabel = "Model",
-		ylabel = "Average Acceptance Rate", legend = :topleft, color = :auto, ylim = (-0.03, 1.2))
+		ylabel = "Average Acceptance Rate", legend = :outerright, color = :auto, ylim = (-0.03, 1.02),
+		margin = 3Plots.mm)
 	savefig("icml2025/plots/accept_rate.png")
 end
 
@@ -99,6 +115,8 @@ df1 = CSV.read("icml2025/exp_results_funnel2.csv", DataFrame)
 df2 = CSV.read("icml2025/exp_results_funnel100.csv", DataFrame)
 df3 = CSV.read("icml2025/exp_results_kilpisjarvi.csv", DataFrame)
 df4 = CSV.read("icml2025/exp_results_orbital.csv", DataFrame)
-df = vcat(df, df2, df3, df4)
+df5 = CSV.read("icml2025/exp_results_mRNA.csv", DataFrame)
+df6 = CSV.read("icml2025/exp_results_prostate.csv", DataFrame)
+df = vcat(df1, df2, df3, df4, df5, df6)
 
 comparison_plots(df)
