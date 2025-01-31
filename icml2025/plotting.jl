@@ -32,14 +32,12 @@ function draw_pairplot(model, seed, explorer)
     df = CSV.read("icml2025/temp/$(seed)_$(model)_$(explorer).csv", DataFrame)
     df = Matrix(df)'
     df = DataFrame(df, :auto)
-    if explorer == "slicer"
-        df = df[:, 1:12]
-    end
+    df = df[:, vcat(1:5, 91:95)] # modify this for difference models
     p = pairplot(df)
     save("icml2025/plots/pairplots/pairplot_$(model)_$(explorer).png", p)
 end
-for model in ["orbital"] # 
-    for explorer in ["nuts", "slicer"] #"adaptive_mala", "adaptive_rwmh", "autorwmh", "drhmc", "automala", 
+for model in ["prostate"] # 
+    for explorer in ["autorwmh", "drhmc", "automala", "nuts", "adaptive_rwmh", "adaptive_mala", "slicer"] #
         draw_pairplot(model, 1, explorer)
     end
 end

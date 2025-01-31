@@ -45,7 +45,7 @@ function pt_sample_from_model(model, seed, my_explorer, n_rounds)
         round += 1 
     end
     miness = min_ess_all_methods(samples, model)
-    minKSess = min_KSess(samples, model)
+    # minKSess = min_KSess(samples, model)
     mean_1st_dim = first(mean(pt))
     var_1st_dim = first(var(pt))
     step_size = if explorer isa SliceSampler
@@ -64,7 +64,7 @@ function pt_sample_from_model(model, seed, my_explorer, n_rounds)
     stats_df = DataFrame(
         explorer = my_explorer, model = model, seed = seed, 
         mean_1st_dim = mean_1st_dim, var_1st_dim = var_1st_dim, time=time, jitter_std = jitter_std, n_logprob = n_logprob, 
-        n_steps=n_steps, miness=miness, minKSess = minKSess, acceptance_prob=acceptance_prob, step_size=step_size, 
+        n_steps=n_steps, miness=miness, minKSess = 0, acceptance_prob=acceptance_prob, step_size=step_size, 
         n_rounds = n_rounds, energy_jump_dist = energy_jump_dist)
     return samples, stats_df
 end
