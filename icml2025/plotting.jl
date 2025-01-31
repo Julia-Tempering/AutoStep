@@ -32,16 +32,16 @@ function draw_pairplot(model, seed, explorer)
     df = CSV.read("icml2025/temp/$(seed)_$(model)_$(explorer).csv", DataFrame)
     df = Matrix(df)'
     df = DataFrame(df, :auto)
-    df = df[:, vcat(1:5, 91:95)] # modify this for difference models
+    df = df[:, vcat(1:5, 96:100)] # modify this for difference models
     p = pairplot(df)
     save("icml2025/plots/pairplots/pairplot_$(model)_$(explorer).png", p)
 end
 for model in ["prostate"] # 
-    for explorer in ["autorwmh", "drhmc", "automala", "nuts", "adaptive_rwmh", "adaptive_mala", "slicer"] #
+    for explorer in ["adaptive_rwmh", "nuts", "slicer"] #"adaptive_mala", "automala", "drhmc", "autorwmh", 
         draw_pairplot(model, 1, explorer)
     end
 end
-draw_pairplot("orbital", 10, "automala")
+draw_pairplot("prostate", 10, "autorwmh")
 
 #=
 comparison of all autoMCMC samplers and NUTS; experiment = "post_db"
