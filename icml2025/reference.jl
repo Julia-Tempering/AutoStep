@@ -35,5 +35,6 @@ end
 N = 10000000
 scale = 0.6
 samples = sample_funnel(N, scale)
+samples = samples'
 samples = DataFrame(samples, :auto)
-CSV.write("icml2025/samples/funnel2.csv", samples) =#
+CSV.write("icml2025/samples/funnel2_new.csv", samples) =#
