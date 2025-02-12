@@ -1,9 +1,9 @@
-using Pigeons, DataFrames, CSV, BridgeStan, LogDensityProblems, Random
+using Pigeons, DataFrames, CSV, BridgeStan, LogDensityProblems, Random, LinearAlgebra, Statistics
 include("orbital_model_definition.jl")
 include(joinpath(dirname(dirname(pathof(Pigeons))), "test", "supporting", "postdb.jl"))
 
-function rwmh(x, ℓ, step, logπ)
-	xp = x + step*randn(length(x))
+function rwmh(x, ℓ, step, logπ, sqrtΣ)
+	xp = x + step*(sqrtΣ*randn(length(x)))
 	ℓp = LogDensityProblems.logdensity(logπ, xp)
 	if log(rand()) <= ℓp - ℓ
 		return xp, ℓp, true
@@ -17,13 +17,14 @@ function mcmc(x0, logπ, niter, steps, skip, name)
 	ℓs = zeros(niter)
 	accs = zeros(length(steps))
 	naccs = 0
+	sqrtΣ = I
 	x = copy(x0)
 	ℓ = LogDensityProblems.logdensity(logπ, x)
 	t0 = time()
 	for i=1:niter
 		for k = 1:skip
 			for j = 1:length(steps)
-				x, ℓ, acc = rwmh(x, ℓ, steps[j], logπ)
+				x, ℓ, acc = rwmh(x, ℓ, steps[j], logπ, sqrtΣ)
 				accs[j] += Int(acc)
 			end
 			naccs += 1
@@ -37,6 +38,9 @@ function mcmc(x0, logπ, niter, steps, skip, name)
 			println("Iteration $i / $niter ItersPerSec $(round(iters_per_sec, digits=2)) MinsRemain $(round(mins_remaining, digits=2)) Log10Steps $(round.(log10.(steps), sigdigits=2)) Avg Accs $(round.(accs/naccs, sigdigits=2))")
     		df = DataFrame([xs[j, :] for j = 1:i], :auto)
 			CSV.write("icml2025/samples_simple/$name.csv", df)
+			if i > 2*length(x)
+				sqrtΣ = cholesky(cov(xs[Int(i/2):i, :]) + 1e-6*I).L
+			end
 		end
 	end
     df = DataFrame([xs[i, :] for i = 1:size(xs, 1)], :auto)
@@ -76,7 +80,7 @@ function main()
 
     ##Kilpisjarvi
 	#x0 = zeros(LogDensityProblems.dimension(kilp_target))
-	#mcmc(x0, kilp_target, 10000000, (10.).^(-5:0.5:-2.5), 10, "kilpisjarvi")
+	#mcmc(x0, kilp_target, 10000000, (10.).^(-2:0.5:2), 10, "kilpisjarvi")
 
 end
 
