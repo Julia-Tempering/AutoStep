@@ -1,5 +1,5 @@
 include("utils.jl")
-using Distributions, LinearAlgebra, ForwardDiff, MCMCChains
+using Distributions, LinearAlgebra, ReverseDiff, MCMCChains
 using Random
 
 
@@ -55,9 +55,9 @@ function leapfrog(q, p, epsilon, n_leapfrogs, log_density_q)
     q_new, p_new = q, p
     try
         for i in 1:n_leapfrogs
-            p_new = p_new + 0.5 * epsilon .* ForwardDiff.gradient(log_density_q, q_new)
+            p_new = p_new + 0.5 * epsilon .* ReverseDiff.gradient(log_density_q, q_new)
             q_new = q_new + epsilon .* p_new
-            p_new = p_new + 0.5 * epsilon .* ForwardDiff.gradient(log_density_q, q_new)
+            p_new = p_new + 0.5 * epsilon .* ReverseDiff.gradient(log_density_q, q_new)
         end
         return q_new, -p_new
     catch e

@@ -1,5 +1,5 @@
 using AdvancedHMC, Distributions, MCMCChains, LogDensityProblems, LinearAlgebra
-using CSV, DataFrames, DelimitedFiles, JSON, Turing, Random, ForwardDiff
+using CSV, DataFrames, DelimitedFiles, JSON, Turing, Random, ReverseDiff
 include("utils.jl")
 
 function adaptive_mala_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwargs...)
@@ -16,7 +16,7 @@ function adaptive_mala_sample_from_model(model, seed, n_rounds; max_samples = 2^
     step_size = 0.1
     dim = LogDensityProblems.dimension(my_model)
 	metric = DenseEuclideanMetric(dim)
-	hamiltonian = Hamiltonian(metric, my_model, ForwardDiff)
+	hamiltonian = Hamiltonian(metric, my_model, ReverseDiff)
 	integrator = Leapfrog(step_size)
 	kernel = HMCKernel(Trajectory{EndPointTS}(integrator, FixedNSteps(1))) # n_leapfrog = 1 to recover MALA
 	adaptor = MassMatrixAdaptor(metric)

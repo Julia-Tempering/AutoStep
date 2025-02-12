@@ -1,22 +1,9 @@
-using Statistics, StatsBase, LogDensityProblems, DataFrames, CSV, ForwardDiff
+using Statistics, StatsBase, LogDensityProblems, DataFrames, CSV, ReverseDiff, ForwardDiff
 using Suppressor, BridgeStan, HypothesisTests, Pigeons, JSON, LinearAlgebra
 
 # define orbital model 
 include("orbital_model_definition.jl")
 orbital_model = Octofitter.LogDensityModel(GL229A; autodiff = :ForwardDiff, verbosity = 4)
-""" 
-Notes for Ivy: 
-
-Octofitter's LogDensityModel already also conforms to the LogDensityProblems interface.
-However, please not that you may need to post-transform samples to get them to 
-look like on the Pigeons GitHub issue link.  
---- See `model.link` or `model.invlink`. in the Octofitter documentation for more information
-E.g., William has already defined for us: 
-	LogDensityProblems.logdensity(p::LogDensityModel, θ) = p.ℓπcallback(θ)
-	LogDensityProblems.logdensity_and_gradient(p::LogDensityModel, θ) = p.∇ℓπcallback(θ)
-	LogDensityProblems.dimension(p::LogDensityModel{D}) where D = D
-	LogDensityProblems.capabilities(::Type{<:LogDensityModel}) = LogDensityProblems.LogDensityOrder{1}()
-"""
 
 # convert model to pigeon-digestable model
 function model_to_target(model)
@@ -159,7 +146,7 @@ LogDensityProblems.capabilities(::Horseshoe) = LogDensityProblems.LogDensityOrde
 # Define the function for log density and its gradient
 function LogDensityProblems.logdensity_and_gradient(model::Union{Funnel, mRNA, Kilpisjarvi, Horseshoe}, x)
 	logp = LogDensityProblems.logdensity(model, x)
-	grad_logp = ForwardDiff.gradient(z -> LogDensityProblems.logdensity(model, z), x)
+	grad_logp = Reverse.gradient(z -> LogDensityProblems.logdensity(model, z), x)
 	return logp, grad_logp
 end
 
