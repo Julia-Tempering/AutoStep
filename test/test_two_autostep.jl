@@ -41,10 +41,7 @@ end
 
 function test_autostep()
     # Define different test cases
-    x_values = [[1.0, 1.0], [0.5, -0.5], [-1.0, 2.0]]
-    z_values = [[0.1, 0.2], [0.5, 0.5], [0.3, -0.3]]
-    a_values = [0.3, 0.5, 0.2]
-    b_values = [0.6, 0.8, 1.0]
+    x_values = [[0.0,0.0], [1.0, 1.0], [0.5, -0.5], [-1.0, 2.0]]
     
     theta0 = 1.0
     f = fRWMH
@@ -53,7 +50,7 @@ function test_autostep()
     rng1 = MersenneTwister(1)
     rng2 = MersenneTwister(1)
 
-    for x in x_values, z in z_values, a in a_values, b in b_values
+    for x in x_values
         
         # Compute autostep2
         new_state2, logacc, ejump, cost, theta, grad_eval = auto_step(x, f, theta0, target, sqrtdiagMhat, rng1)

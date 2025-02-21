@@ -93,15 +93,17 @@ function auto_rwmh!(
     dim = length(state)
 
     # diag_precond = get_buffer(recorders.buffers, :ar_diag_precond, dim)
-    diag_precond = start_state = random_walk = zero(state)
-    build_preconditioner!(diag_precond, explorer.preconditioner, rng, explorer.estimated_target_std_deviations)
+    diag_precond = zero(state)
+    start_state = zero(state)
+    random_walk = zero(state)
+    # build_preconditioner!(diag_precond, explorer.preconditioner, rng, explorer.estimated_target_std_deviations)
     #start_state = get_buffer(recorders.buffers, :ar_state_buffer, dim)
     #random_walk = get_buffer(recorders.buffers, :ar_walk_buffer, dim)
     
     for _ in 1:explorer.n_refresh
         # Draw bounds for the log acceptance ratio
         selector_params = draw_parameters(explorer.step_size_selector,rng)
-        
+        build_preconditioner!(diag_precond, explorer.preconditioner, rng, explorer.estimated_target_std_deviations)
         # build augmented state
         start_state .= state
         randn!(rng, random_walk)
