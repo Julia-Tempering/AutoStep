@@ -1,18 +1,18 @@
 using Distributions, MCMCChains, LogDensityProblems, LinearAlgebra
 using CSV, DataFrames, DelimitedFiles, JSON, Random
-include("utils.jl")
+# include("utils.jl")
 
 # using NUTS in Turing.jl
 function autostep2_sample_model(model, seed, explorer, n_rounds, adapt_precond)
 	# make model and data from the arguments
 	my_data = stan_data(model)
 	my_model = logdens_model(model, my_data)
-	Random.seed!(seed)
 	f = if startswith(explorer, "AutoStep RWMH")
 		fRWMH
 	elseif startswith(explorer, "AutoStep MALA")
 		fMALA
 	end
+	rng = MersenneTwister(seed)
 
 	n_logprob = n_grad_eval = 0
 	miness = my_time = 0.0
@@ -26,7 +26,7 @@ function autostep2_sample_model(model, seed, explorer, n_rounds, adapt_precond)
 	for i in 1:n_rounds
 		n_samples = 2^i
 		my_time += @elapsed samples, costs, log_accept, ejumps, thetas, grad_evals =
-			run_sampler(initial_params, auto_step, f, theta0, my_model, sqrtdiagMhat, n_samples)
+			run_sampler(initial_params, auto_step, f, theta0, my_model, sqrtdiagMhat, n_samples, rng)
 		theta0 = median(thetas)
 		if adapt_precond
 			sqrtdiagMhat = vec(1.0 ./ std(samples, dims = 1))
@@ -105,16 +105,16 @@ function η(x, z, a, b, θ0, f, target, sqrtdiagM)
 	return Dirac(θ0 * (2.0)^δ), cost, grad_eval
 end
 
-function auto_step(x, f, θ0, target, sqrtdiagMhat)
+function auto_step(x, f, θ0, target, sqrtdiagMhat, rng)
 	dim = length(x)
-	a0, b0 = rand(), rand()
+	a0, b0 = rand(rng), rand(rng)
 	a = min(a0, b0)
 	b = max(a0, b0)
-	xi = rand() < 0.666 ? rand(0:1) : rand(Beta(1.0, 1.0))
+	xi = rand(rng) < 0.666 ? rand(rng, 0:1) : rand(rng, Beta(1.0, 1.0))
 	sqrtdiagM = xi .* sqrtdiagMhat .+ (1 - xi)
-	z = randn(dim) .* sqrtdiagM
+	z = randn(rng, dim) .* sqrtdiagM
 	ηdist, cost1, grad_eval1 = η(x, z, a, b, θ0, f, target, sqrtdiagM)
-	θ = rand(ηdist)
+	θ = rand(rng, ηdist)
 	xp, zp, grad_eval2 = f(x, z, θ, target, sqrtdiagM)
 	ηpdist, cost2, grad_eval3 = η(xp, zp, a, b, θ0, f, target, sqrtdiagM)
 	energyjump = try
@@ -125,26 +125,26 @@ function auto_step(x, f, θ0, target, sqrtdiagMhat)
 	ℓ = energyjump + logpdf(ηpdist, θ) - logpdf(ηdist, θ)
 	cost = 1 + cost1 + cost2
 	grad_eval = grad_eval1 + grad_eval2 + grad_eval3
-	if log(rand()) ≤ ℓ
+	if log(rand(rng)) ≤ ℓ
 		return xp, min(0, ℓ), energyjump, cost, θ, grad_eval
 	else
 		return x, min(0, ℓ), 0.0, cost, θ, grad_eval
 	end
 end
 
-function fix_step(x, f, θ0, target, sqrtdiagMhat)
-	z = rand(auxtarget)
+function fix_step(x, f, θ0, target, sqrtdiagMhat, rng)
+	z = rand(rng, auxtarget)
 	xp, zp, grad_eval = f(x, z, θ0, target, sqrtdiagM)
 	ℓ = LogDensityProblems.logdensity(target, xp) + sum(logpdf.(Normal.(0, sqrtdiagM), zp)) - LogDensityProblems.logdensity(target, x) - sum(logpdf.(Normal.(0, sqrtdiagM), z))
 	cost = 1
-	if log(rand()) ≤ ℓ
+	if log(rand(rng)) ≤ ℓ
 		return xp, min(0, ℓ), ℓ, cost, θ0, grad_eval
 	else
 		return x, min(0, ℓ), 0.0, cost, θ0, grad_eval
 	end
 end
 
-function run_sampler(x0, kernel, f, θ0, target, sqrtdiagMhat, niter)
+function run_sampler(x0, kernel, f, θ0, target, sqrtdiagMhat, niter, rng)
 	x = copy(x0)
 	xs = zeros(niter, length(x0))
 	cs = zeros(niter)
@@ -153,7 +153,8 @@ function run_sampler(x0, kernel, f, θ0, target, sqrtdiagMhat, niter)
 	thetas = zeros(niter)
 	grad_evals = zeros(niter)
 	for i ∈ 1:niter
-		x, logacc, ejump, cost, θ, grad_eval = kernel(x, f, θ0, target, sqrtdiagMhat)
+		x, logacc, ejump, cost, θ, grad_eval = kernel(x, f, θ0, target, sqrtdiagMhat, rng)
+		println(x)
 		xs[i, :] .= x
 		cs[i] = (i == 1) ? cost : cs[i-1] + cost
 		logas[i] = logacc
@@ -167,5 +168,5 @@ end
 
 # run_sampler(zeros(100), auto_step, fMALA, 1.0, Funnel(99, 2.0), ones(100), 100)
 
-# samples, stats_df = autostep2_sample_model("funnel100", 1, "AutoStep MALA", 15, false)
+samples, stats_df = autostep2_sample_model("funnel2", 1, "AutoStep RWMH", 5, false)
 # print(stats_df)

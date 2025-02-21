@@ -8,7 +8,7 @@ orbital_model = Octofitter.LogDensityModel(GL229A; autodiff = :ForwardDiff, verb
 # convert model to pigeon-digestable model
 function model_to_target(model)
 	if startswith(model, "funnel2")
-		return Pigeons.stan_funnel(1, 0.6)
+		return Pigeons.stan_funnel(1, 1.0)
 	elseif startswith(model, "funnel100")
 		return Pigeons.stan_funnel(99, 6.0)
 	elseif startswith(model, "mRNA")
@@ -35,11 +35,8 @@ struct Funnel
 	scale::Float64
 end
 function LogDensityProblems.logdensity(model::Funnel, x)
-	try
-        return logpdf(Normal(0, 3), x[1]) + sum(logpdf.(Normal(0, exp(x[1] / model.scale)), x[2:end]))
-    catch e 
-        return -Inf
-    end
+	# test very big x(1); remove try catch
+	return logpdf(Normal(0, 3), x[1]) + sum(logpdf.(Normal(0, exp(x[1] / model.scale)), x[2:end]))
 end
 LogDensityProblems.dimension(model::Funnel) = model.dim + 1
 LogDensityProblems.capabilities(::Funnel) = LogDensityProblems.LogDensityOrder{0}()
@@ -146,7 +143,7 @@ LogDensityProblems.capabilities(::Horseshoe) = LogDensityProblems.LogDensityOrde
 # Define the function for log density and its gradient
 function LogDensityProblems.logdensity_and_gradient(model::Union{Funnel, mRNA, Kilpisjarvi, Horseshoe}, x)
 	logp = LogDensityProblems.logdensity(model, x)
-	grad_logp = Reverse.gradient(z -> LogDensityProblems.logdensity(model, z), x)
+	grad_logp = ReverseDiff.gradient(z -> LogDensityProblems.logdensity(model, z), x)
 	return logp, grad_logp
 end
 
@@ -170,7 +167,7 @@ end
 
 function stan_data(model::String; dataset = nothing, dim = nothing, scale = nothing)
 	if startswith(model, "funnel2")
-		Dict("dim" => 1, "scale" => 0.3)
+		Dict("dim" => 1, "scale" => 0.5)
 	elseif startswith(model, "funnel100")
 		Dict("dim" => 99, "scale" => 6.0)
 	elseif startswith(model, "orbital")

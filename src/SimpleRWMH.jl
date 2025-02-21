@@ -92,21 +92,22 @@ function auto_rwmh!(
 
     dim = length(state)
 
-    diag_precond = get_buffer(recorders.buffers, :ar_diag_precond, dim)
+    # diag_precond = get_buffer(recorders.buffers, :ar_diag_precond, dim)
+    diag_precond = start_state = random_walk = zero(state)
     build_preconditioner!(diag_precond, explorer.preconditioner, rng, explorer.estimated_target_std_deviations)
-    start_state = get_buffer(recorders.buffers, :ar_state_buffer, dim)
-    random_walk = get_buffer(recorders.buffers, :ar_walk_buffer, dim)
+    #start_state = get_buffer(recorders.buffers, :ar_state_buffer, dim)
+    #random_walk = get_buffer(recorders.buffers, :ar_walk_buffer, dim)
     
     for _ in 1:explorer.n_refresh
+        # Draw bounds for the log acceptance ratio
+        selector_params = draw_parameters(explorer.step_size_selector,rng)
+        
         # build augmented state
         start_state .= state
         randn!(rng, random_walk)
         random_walk .= random_walk ./ diag_precond # divide diag_precond because precond is inv std
         init_joint_log = target_log_potential(state)
         @assert isfinite(init_joint_log) "SimpleRWMH can only be called on a configuration of positive density."
-
-        # Draw bounds for the log acceptance ratio
-        selector_params = draw_parameters(explorer.step_size_selector,rng)
 
         # compute the proposed step size
         proposed_exponent =
@@ -117,20 +118,20 @@ function auto_rwmh!(
                 explorer.step_size, 
                 explorer.step_size_selector,
                 selector_params)
-        @record_if_requested!(recorders, :num_doubling, (chain, abs(proposed_exponent))) #record number of doublings/halvings
-        @record_if_requested!(recorders, :step_size_exponent, (chain, proposed_exponent)) #record number of doublings/halvings
+        #@record_if_requested!(recorders, :num_doubling, (chain, abs(proposed_exponent))) #record number of doublings/halvings
+        #@record_if_requested!(recorders, :step_size_exponent, (chain, proposed_exponent)) #record number of doublings/halvings
         proposed_jitter = rand(rng, explorer.step_jitter.dist)
         proposed_step_size = explorer.step_size * 2.0^(proposed_exponent+proposed_jitter)
 
         # move to proposed point
         random_walk_dynamics!(state, proposed_step_size, random_walk)
         final_joint_log = target_log_potential(state)
-        @record_if_requested!(recorders, :explorer_n_steps, (chain, 2)) # two logprob evaluations: final and init
+        #@record_if_requested!(recorders, :explorer_n_steps, (chain, 2)) # two logprob evaluations: final and init
 
         if !isfinite(final_joint_log) # check validity of new point (only relevant for nontrivial jitter)
             state .= start_state      # reject: go back to start state
-            @record_if_requested!(recorders, :reversibility_rate, (chain, false))
-            @record_if_requested!(recorders, :explorer_acceptance_pr, (chain, zero(final_joint_log)))
+            #@record_if_requested!(recorders, :reversibility_rate, (chain, false))
+            #@record_if_requested!(recorders, :explorer_acceptance_pr, (chain, zero(final_joint_log)))
         elseif use_mh_accept_reject
             # flip
             random_walk .*= -one(eltype(random_walk))
@@ -143,8 +144,8 @@ function auto_rwmh!(
                     explorer.step_size_selector,
                     selector_params)
             reversibility_passed = reversed_exponent == proposed_exponent
-            @record_if_requested!(recorders, :reversibility_rate, (chain, reversibility_passed))
-            @record_if_requested!(recorders, :abs_exponent_diff, (chain, abs(proposed_exponent - reversed_exponent)))
+            #@record_if_requested!(recorders, :reversibility_rate, (chain, reversibility_passed))
+            #@record_if_requested!(recorders, :abs_exponent_diff, (chain, abs(proposed_exponent - reversed_exponent)))
 
             # compute the jitter z' needed to return to initial position
             # due to the involutive nature of the flipped leapfrog, this occurs iff
@@ -163,8 +164,8 @@ function auto_rwmh!(
             else
                 zero(final_joint_log)
             end
-            @record_if_requested!(recorders, :explorer_acceptance_pr, (chain, probability))
-            @record_if_requested!(recorders, :jitter_proposal_log_diff, (chain, jitter_proposal_log_diff))
+            #@record_if_requested!(recorders, :explorer_acceptance_pr, (chain, probability))
+            #@record_if_requested!(recorders, :jitter_proposal_log_diff, (chain, jitter_proposal_log_diff))
             if rand(rng) < probability
                 # accept: nothing to do, we work in-place
             else
@@ -172,8 +173,9 @@ function auto_rwmh!(
                 state .= start_state
             end
         end
+        return state
         final_joint_log = target_log_potential(state)
-        @record_if_requested!(recorders, :energy_jump_distance, (chain, abs(final_joint_log - init_joint_log)))
+        #@record_if_requested!(recorders, :energy_jump_distance, (chain, abs(final_joint_log - init_joint_log)))
     end
 end
 
@@ -203,8 +205,8 @@ function auto_rwmh_step_size(
         else
             0, 0
         end
-    @record_if_requested!(recorders, :explorer_n_steps, (chain, 1+n_steps)) # every log_joint_difference call logprob once
-    @record_if_requested!(recorders, :as_factors, (chain, 2.0^exponent))
+    # @record_if_requested!(recorders, :explorer_n_steps, (chain, 1+n_steps)) # every log_joint_difference call logprob once
+    # @record_if_requested!(recorders, :as_factors, (chain, 2.0^exponent))
     return exponent
 end
 
@@ -216,10 +218,12 @@ function rwmh_log_joint_difference_function(
 
     dim = length(state)
 
-    state_before = get_buffer(recorders.buffers, :as_ljdf_state_before_buffer, dim)
+    # state_before = get_buffer(recorders.buffers, :as_ljdf_state_before_buffer, dim)
+    state_before = zero(state)
     state_before .= state
 
-    random_walk_before = get_buffer(recorders.buffers, :as_ljdf_random_walk_before_buffer, dim)
+    # random_walk_before = get_buffer(recorders.buffers, :as_ljdf_random_walk_before_buffer, dim)
+    random_walk_before = zero(random_walk)
     random_walk_before .= random_walk
 
     function result(step_size)

@@ -1,5 +1,5 @@
-include("../test/activate_test_env.jl")
-include("utils.jl")
+#include("../test/activate_test_env.jl")
+#include("utils.jl")
 
 function pt_sample_from_model(model, seed, my_explorer, n_rounds)
     round = 1 # NB: cannot start from >1 otherwise we miss the explorer n_steps from all but last round
@@ -74,5 +74,6 @@ end
 # first_margin = [sample[1] for sample in samples]
 # histogram(first_margin)
 # print(stats_df)
-#pt_sample_from_model("funnel2", 1, "AutoStep MALA", 15)
+samples, stats_df = pt_sample_from_model("funnel2", 1, "AutoStep RWMH", 5)
+println(samples)
 #pt_sample_from_model("funnel2", 1, "HitAndRunSlicer", 15)

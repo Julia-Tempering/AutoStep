@@ -1,6 +1,9 @@
 include("utils.jl")
 
-using Pigeons, LogDensityProblems, BenchmarkTools, ForwardDiff
+using BenchmarkTools, Zygote, ReverseDiff, ForwardDiff, Enzyme
+import DifferentiationInterface as DI
+import Mooncake
+
 
 function grad_to_logp_ratio(model)
 	pt = pigeons(
@@ -9,23 +12,34 @@ function grad_to_logp_ratio(model)
 		n_rounds = 12,
         record = [traces]
 	)
-	samples = get_sample(pt)
+	my_samples = get_sample(pt)
 
     my_data = stan_data(model)
 	my_model = logdens_model(model, my_data)
-    log_density_q(x) = LogDensityProblems.logdensity(my_model, x)
+    # log_density_q(x) = LogDensityProblems.logdensity(my_model, x)
+	function log_density_q(x::Vector{Float64})::Float64
+		return LogDensityProblems.logdensity(my_model, x)::Float64
+	end
 
 	# Measure time for log probability
 	logprob_time = @belapsed begin
-		for x in samples
+		for x in my_samples
 			log_density_q(x)
 		end
 	end
 
 	# Measure time for gradient
+	backend = ADTypes.AutoMooncake(config = nothing)
+	prep = DI.prepare_gradient(log_density_q, backend, zeros(100))
 	grad_time = @belapsed begin
-		for x in samples
-			ForwardDiff.gradient(log_density_q, x)
+		for x in my_samples
+			# ReverseDiff.gradient(log_density_q, x)
+			# enzyme
+			# output = zero(x)
+			# autodiff(Reverse, log_density_q, Active, Duplicated(x, output))
+			# mooncake: in progress
+			# 
+			Mooncake.gradient(log_density_q, prep, backend, x)
 		end
 	end
 
@@ -34,6 +48,15 @@ function grad_to_logp_ratio(model)
 	println("$model: $eval_ratio")
 end
 
-for model in ["funnel2", "funnel100", "kilpisjarvi", "mRNA", "horseshoe"]
+for model in ["funnel100"] # "funnel2", , "kilpisjarvi", "mRNA", "horseshoe"
     grad_to_logp_ratio(model)
 end
+
+
+# funnel100
+# ReverseDiff: 300+
+# Zygote: 700+
+# ForwardDiff: 70+
+# Enzyme: 
+# Mooncake: 
+

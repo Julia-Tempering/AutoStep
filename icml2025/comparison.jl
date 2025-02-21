@@ -5,8 +5,8 @@ include("drhmc.jl")
 include("autostep.jl")
 include("autostep2.jl")
 
-models = ["funnel100"]
-seeds = 1:10
+models = ["funnel2"]
+seeds = [1]
 n_rounds = 15
 exp_results = DataFrame(
     explorer = String[],
@@ -74,7 +74,7 @@ for model in models
         samples_drhmc = nothing
         
         println("Finish seed $seed")
-        CSV.write("icml2025/exp_results_$(model)_extra.csv", exp_results)
+        CSV.write("icml2025/exp_results_$(model)_temp.csv", exp_results)
     end
 end
 
