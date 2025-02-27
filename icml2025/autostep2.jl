@@ -111,7 +111,7 @@ function auto_step(x, f, θ0, target, sqrtdiagMhat, rng)
 	u = rand(rng)
 	xi = u < 1//3 ? 0 : (u < 2//3 ? 1 : rand(rng))
 	# xi = rand(rng) < 1/3 ? rand(rng, 0:1) : rand(rng, Beta(1.0, 1.0))
-	sqrtdiagM = xi .* sqrtdiagMhat .+ (1 - xi)
+	sqrtdiagM = (1 - xi) .* sqrtdiagMhat .+ xi
 	sqrtdiagM .= ifelse.(sqrtdiagM .== 0, 1, sqrtdiagM) # if sqrtdiagM is 0, replace with 1
 	println("autostep2 sqrtdiagM: $sqrtdiagM")
 	a0, b0 = rand(rng), rand(rng)
