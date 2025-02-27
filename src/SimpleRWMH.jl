@@ -96,18 +96,20 @@ function auto_rwmh!(
     diag_precond = zero(state)
     start_state = zero(state)
     random_walk = zero(state)
-    # build_preconditioner!(diag_precond, explorer.preconditioner, rng, explorer.estimated_target_std_deviations)
+    build_preconditioner!(diag_precond, explorer.preconditioner, rng, explorer.estimated_target_std_deviations)
+    println("autostep diag_precond: $diag_precond")
     #start_state = get_buffer(recorders.buffers, :ar_state_buffer, dim)
     #random_walk = get_buffer(recorders.buffers, :ar_walk_buffer, dim)
     
     for _ in 1:explorer.n_refresh
         # Draw bounds for the log acceptance ratio
-        selector_params = draw_parameters(explorer.step_size_selector,rng)
-        build_preconditioner!(diag_precond, explorer.preconditioner, rng, explorer.estimated_target_std_deviations)
+        a = rand(rng)
+        b = rand(rng)
+        selector_params = [log(min(a, b)), log(max(a, b))] # draw_parameters(explorer.step_size_selector,rng)
         # build augmented state
         start_state .= state
         randn!(rng, random_walk)
-        random_walk .= random_walk ./ diag_precond # divide diag_precond because precond is inv std
+        random_walk .= random_walk .* diag_precond # divide diag_precond because precond is inv std
         init_joint_log = target_log_potential(state)
         @assert isfinite(init_joint_log) "SimpleRWMH can only be called on a configuration of positive density."
 

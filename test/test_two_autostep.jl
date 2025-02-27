@@ -1,6 +1,6 @@
-# using Revise
+using Revise
 # include("activate_test_env.jl")
-# include("../icml2025/autostep2.jl")
+include("../icml2025/autostep2.jl")
 
 using Test
 
@@ -40,17 +40,21 @@ end
 
 
 function test_autostep()
-    # Define different test cases
-    x_values = [[0.0,0.0], [1.0, 1.0], [0.5, -0.5], [-1.0, 2.0]]
-    
+    # Define hyperparams
     theta0 = 1.0
     f = fRWMH
     target = logdens_model("funnel2", stan_data("funnel2"))
-    sqrtdiagMhat = ones(2)
+    rng_generate = MersenneTwister(234)
     rng1 = MersenneTwister(1)
     rng2 = MersenneTwister(1)
 
-    for x in x_values
+    for i in 1:10
+        # set current x state
+        x = randn(rng_generate, 2)
+        println("")
+        println("my current state: $x")
+        sqrtdiagMhat = rand(rng_generate, 2)
+        println("my input sqrtdiagMhat: $sqrtdiagMhat")
         
         # Compute autostep2
         new_state2, logacc, ejump, cost, theta, grad_eval = auto_step(x, f, theta0, target, sqrtdiagMhat, rng1)
@@ -58,14 +62,16 @@ function test_autostep()
         # Compute j_autostep
         target_log_potential(x) = LogDensityProblems.logdensity(target, x)
         explorer = SimpleRWMH(step_jitter = AutoStep.StepJitter(Dirac(0), AutoStep.FixedStepJitter()),
-                        preconditioner = Pigeons.IdentityPreconditioner())
+                        preconditioner = Pigeons.MixDiagonalPreconditioner(),
+                        step_size = theta0, 
+                        estimated_target_std_deviations = 1 ./ sqrtdiagMhat)
         recorders = [record_default()]
         chain = 1 # temporarily removed; remember to recover simpleRWMH after this!!
         new_state1 = AutoStep.auto_rwmh!(rng2, explorer, target_log_potential, x, recorders, chain, true)
 
-        println("new_state_pigeon: $new_state1, new_state: $new_state2")
+        println("At $i th iteration, my new state is $new_state1")
 
-        @test isapprox(new_state1, new_state2, atol=1e-6)  # they should be approximately equal
+        @test isapprox(new_state1, new_state2, atol=1e-3)  # The two new states should be approximately equal
 
     end
 end

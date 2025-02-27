@@ -107,11 +107,16 @@ end
 
 function auto_step(x, f, θ0, target, sqrtdiagMhat, rng)
 	dim = length(x)
+	# random mixing of preconditioner
+	u = rand(rng)
+	xi = u < 1//3 ? 0 : (u < 2//3 ? 1 : rand(rng))
+	# xi = rand(rng) < 1/3 ? rand(rng, 0:1) : rand(rng, Beta(1.0, 1.0))
+	sqrtdiagM = xi .* sqrtdiagMhat .+ (1 - xi)
+	sqrtdiagM .= ifelse.(sqrtdiagM .== 0, 1, sqrtdiagM) # if sqrtdiagM is 0, replace with 1
+	println("autostep2 sqrtdiagM: $sqrtdiagM")
 	a0, b0 = rand(rng), rand(rng)
 	a = min(a0, b0)
 	b = max(a0, b0)
-	xi = rand(rng) < 0.666 ? rand(rng, 0:1) : rand(rng, Beta(1.0, 1.0))
-	sqrtdiagM = xi .* sqrtdiagMhat .+ (1 - xi)
 	z = randn(rng, dim) .* sqrtdiagM
 	ηdist, cost1, grad_eval1 = η(x, z, a, b, θ0, f, target, sqrtdiagM)
 	θ = rand(rng, ηdist)
@@ -168,5 +173,5 @@ end
 
 # run_sampler(zeros(100), auto_step, fMALA, 1.0, Funnel(99, 2.0), ones(100), 100)
 
-samples, stats_df = autostep2_sample_model("funnel2", 1, "AutoStep RWMH", 5, false)
+# samples, stats_df = autostep2_sample_model("funnel2", 1, "AutoStep RWMH", 5, false)
 # print(stats_df)
