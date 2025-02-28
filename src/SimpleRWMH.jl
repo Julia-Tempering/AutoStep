@@ -92,14 +92,10 @@ function auto_rwmh!(
 
     dim = length(state)
 
-    # diag_precond = get_buffer(recorders.buffers, :ar_diag_precond, dim)
-    diag_precond = zero(state)
-    start_state = zero(state)
-    random_walk = zero(state)
+    diag_precond = get_buffer(recorders.buffers, :ar_diag_precond, dim)
+    start_state = get_buffer(recorders.buffers, :ar_state_buffer, dim)
+    random_walk = get_buffer(recorders.buffers, :ar_walk_buffer, dim)
     build_preconditioner!(diag_precond, explorer.preconditioner, rng, explorer.estimated_target_std_deviations)
-    println("autostep diag_precond: $diag_precond")
-    #start_state = get_buffer(recorders.buffers, :ar_state_buffer, dim)
-    #random_walk = get_buffer(recorders.buffers, :ar_walk_buffer, dim)
     
     for _ in 1:explorer.n_refresh
         # Draw bounds for the log acceptance ratio
@@ -122,20 +118,20 @@ function auto_rwmh!(
                 explorer.step_size, 
                 explorer.step_size_selector,
                 selector_params)
-        #@record_if_requested!(recorders, :num_doubling, (chain, abs(proposed_exponent))) #record number of doublings/halvings
-        #@record_if_requested!(recorders, :step_size_exponent, (chain, proposed_exponent)) #record number of doublings/halvings
+        @record_if_requested!(recorders, :num_doubling, (chain, abs(proposed_exponent))) #record number of doublings/halvings
+        @record_if_requested!(recorders, :step_size_exponent, (chain, proposed_exponent)) #record number of doublings/halvings
         proposed_jitter = rand(rng, explorer.step_jitter.dist)
         proposed_step_size = explorer.step_size * 2.0^(proposed_exponent+proposed_jitter)
 
         # move to proposed point
         random_walk_dynamics!(state, proposed_step_size, random_walk)
         final_joint_log = target_log_potential(state)
-        #@record_if_requested!(recorders, :explorer_n_steps, (chain, 2)) # two logprob evaluations: final and init
+        @record_if_requested!(recorders, :explorer_n_steps, (chain, 2)) # two logprob evaluations: final and init
 
         if !isfinite(final_joint_log) # check validity of new point (only relevant for nontrivial jitter)
             state .= start_state      # reject: go back to start state
-            #@record_if_requested!(recorders, :reversibility_rate, (chain, false))
-            #@record_if_requested!(recorders, :explorer_acceptance_pr, (chain, zero(final_joint_log)))
+            @record_if_requested!(recorders, :reversibility_rate, (chain, false))
+            @record_if_requested!(recorders, :explorer_acceptance_pr, (chain, zero(final_joint_log)))
         elseif use_mh_accept_reject
             # flip
             random_walk .*= -one(eltype(random_walk))
@@ -148,8 +144,8 @@ function auto_rwmh!(
                     explorer.step_size_selector,
                     selector_params)
             reversibility_passed = reversed_exponent == proposed_exponent
-            #@record_if_requested!(recorders, :reversibility_rate, (chain, reversibility_passed))
-            #@record_if_requested!(recorders, :abs_exponent_diff, (chain, abs(proposed_exponent - reversed_exponent)))
+            @record_if_requested!(recorders, :reversibility_rate, (chain, reversibility_passed))
+            @record_if_requested!(recorders, :abs_exponent_diff, (chain, abs(proposed_exponent - reversed_exponent)))
 
             # compute the jitter z' needed to return to initial position
             # due to the involutive nature of the flipped leapfrog, this occurs iff
@@ -168,8 +164,8 @@ function auto_rwmh!(
             else
                 zero(final_joint_log)
             end
-            #@record_if_requested!(recorders, :explorer_acceptance_pr, (chain, probability))
-            #@record_if_requested!(recorders, :jitter_proposal_log_diff, (chain, jitter_proposal_log_diff))
+            @record_if_requested!(recorders, :explorer_acceptance_pr, (chain, probability))
+            @record_if_requested!(recorders, :jitter_proposal_log_diff, (chain, jitter_proposal_log_diff))
             if rand(rng) < probability
                 # accept: nothing to do, we work in-place
             else
@@ -179,7 +175,7 @@ function auto_rwmh!(
         end
         return state
         final_joint_log = target_log_potential(state)
-        #@record_if_requested!(recorders, :energy_jump_distance, (chain, abs(final_joint_log - init_joint_log)))
+        @record_if_requested!(recorders, :energy_jump_distance, (chain, abs(final_joint_log - init_joint_log)))
     end
 end
 
