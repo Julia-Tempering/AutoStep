@@ -42,6 +42,32 @@ end
 #     end
 # end
 
+# helper function to create dot-line plots
+function create_plot(df_filtered::DataFrame, df_label::Symbol, label::AbstractString, figure_name::AbstractString, model_mapping, explorer_mapping, legend_place::Symbol)
+	df_summary = combine(groupby(df_filtered, [:model, :explorer])) do subdf
+		q25, med, q75 = quantile(subdf[!, df_label], [0.25, 0.5, 0.75])
+		(med = med, q25 = q25, q75 = q75)
+	end
+	df_summary.error_low = df_summary.med .- df_summary.q25
+	df_summary.error_high = df_summary.q75 .- df_summary.med
+	df_summary.model_index = getindex.(Ref(model_mapping), df_summary.model)
+	df_summary.explorer_shift = [explorer_mapping[e] for e in df_summary.explorer]
+	df_summary.position = df_summary.model_index .+ df_summary.explorer_shift
+	p = @df df_summary StatsPlots.scatter(
+		:position, :med, group = :explorer,
+		yerror = (df_summary.error_low, df_summary.error_high),  # IQR range
+		markersize = 8, markerstrokewidth = 1.5, marker = :circle,  # Large dots
+		xlabel = "Model", ylabel = label,
+		yaxis = :log10, legend = legend_place,
+		yticks = 10 .^ range(floor(log10(minimum(df_summary.q25))), ceil(log10(maximum(df_summary.q75))), length = 6),  # Auto log ticks
+		color = :auto,  # Ensure distinct colors per group
+		margin = 3Plots.mm,
+		xticks = (collect(values(model_mapping)), keys(model_mapping)),
+	)
+	vline!(p, [100, 300, 500, 700], linestyle = :dash, color = :grey, label = false)
+	savefig("icml2025/plots/$(figure_name).png")
+end
+
 #=
 comparison of all autoMCMC samplers and NUTS; experiment = "post_db"
 =#
@@ -53,10 +79,6 @@ function comparison_plots(df::DataFrame)
 		df.n_logprob .+ 2 * df.n_steps .* log_prob_gradient_ratio.(df.model), # 1 leapfrog = 2 gradient eval
 	) # gradient based: we use cost = #log_potential_eval + eta * #gradient_eval, where eta is model dependent
 	df = filter(row -> !(row.explorer == "AutoStep RWMH (precond)" || row.explorer == "AutoStep MALA (precond)"), df)
-	df_filtered = filter(row -> !isnan(row.miness), df) # need to remove NaN
-	df_filtered.miness_per_sec = df_filtered.miness ./ df_filtered.time
-	df_filtered.miness_per_cost = df_filtered.miness ./ df_filtered.cost
-	df.minKSess_per_sec = df.minKSess ./ df.time
 
 	default(
 		xguidefontsize = 14,  # X-axis label font size
@@ -72,160 +94,31 @@ function comparison_plots(df::DataFrame)
 		"HitAndRunSlicer" => 0, "NUTS" => 22, "adaptive MALA" => 44, "adaptive RWMH" => 66)
 	sort!(df, :model) # ensure ordering on x-axis
 
+	# minESS, minESS / sec, minESS / cost
+	df_filtered = filter(row -> !isnan(row.miness), df) # need to remove NaN
+	create_plot(df_filtered, :miness, "minESS", "miness", model_mapping, explorer_mapping, :bottomleft)
+	df_filtered.miness_per_sec = df_filtered.miness ./ df_filtered.time
+	create_plot(df_filtered, :miness_per_sec, "minESS / sec", "miness_per_sec", model_mapping, explorer_mapping, :bottomleft)
+	df_filtered.miness_per_cost = df_filtered.miness ./ df_filtered.cost
+	create_plot(df_filtered, :miness_per_cost, "minESS / cost", "miness_per_cost", model_mapping, explorer_mapping, :bottomleft)
 
-	# minESS
-	df_summary = combine(groupby(df_filtered, [:model, :explorer])) do subdf
-		q25, med, q75 = quantile(subdf.miness, [0.25, 0.5, 0.75])
-		(med = med, q25 = q25, q75 = q75)
-	end
-	df_summary.error_low = df_summary.med .- df_summary.q25
-	df_summary.error_high = df_summary.q75 .- df_summary.med
-	df_summary.model_index = getindex.(Ref(model_mapping), df_summary.model)
-	df_summary.explorer_shift = [explorer_mapping[e] for e in df_summary.explorer]
-	df_summary.position = df_summary.model_index .+ df_summary.explorer_shift
-	p = @df df_summary StatsPlots.scatter(
-		:position, :med, group = :explorer,
-		yerror = (df_summary.error_low, df_summary.error_high),  # IQR range
-		markersize = 8, markerstrokewidth = 1.5, marker = :circle,  # Large dots
-		xlabel = "Model", ylabel = "minESS",
-		yaxis = :log10, legend = :bottomleft,
-		yticks = 10 .^ range(floor(log10(minimum(df_summary.q25))), ceil(log10(maximum(df_summary.q75))), length = 6),  # Auto log ticks
-		color = :auto,  # Ensure distinct colors per group
-		margin = 3Plots.mm,
-		xticks = (collect(values(model_mapping)), keys(model_mapping)),
-	)
-	vline!(p, [100, 300, 500, 700], linestyle = :dash, color = :grey, label = false)
-	savefig("icml2025/plots/miness.png")
+	# min geyerESS
+	df_filtered = filter(row -> !isnan(row.geyerESS), df) # need to remove NaN
+	create_plot(df_filtered, :geyerESS, "min geyerESS", "geyerESS", model_mapping, explorer_mapping, :topright)
+	df_filtered.geyerESS_per_sec = df_filtered.geyerESS ./ df_filtered.time
+	create_plot(df_filtered, :geyerESS_per_sec, "min geyerESS / sec", "geyerESS_per_sec", model_mapping, explorer_mapping, :topright)
+	df_filtered.geyerESS_per_cost = df_filtered.geyerESS ./ df_filtered.cost
+	create_plot(df_filtered, :geyerESS_per_cost, "min geyerESS / cost", "geyerESS_per_cost", model_mapping, explorer_mapping, :topright)
 
-	# min KSESS
-	df_summary = combine(groupby(df, [:model, :explorer])) do subdf
-		q25, med, q75 = quantile(subdf.minKSess, [0.25, 0.5, 0.75])
-		(med = med, q25 = q25, q75 = q75)
-	end
-	df_summary.error_low = df_summary.med .- df_summary.q25
-	df_summary.error_high = df_summary.q75 .- df_summary.med
-	df_summary.model_index = getindex.(Ref(model_mapping), df_summary.model)
-	df_summary.explorer_shift = [explorer_mapping[e] for e in df_summary.explorer]
-	df_summary.position = df_summary.model_index .+ df_summary.explorer_shift
-	p = @df df_summary StatsPlots.scatter(
-		:position, :med, group = :explorer,
-		yerror = (df_summary.error_low, df_summary.error_high),  # IQR range
-		markersize = 8, markerstrokewidth = 1.5, marker = :circle,  # Large dots
-		xlabel = "Model", ylabel = "min KSESS",
-		yaxis = :log10, legend = :topright,
-		yticks = 10 .^ range(floor(log10(minimum(df_summary.q25))), ceil(log10(maximum(df_summary.q75))), length = 6),  # Auto log ticks
-		color = :auto,  # Ensure distinct colors per group
-		margin = 3Plots.mm,
-		xticks = (collect(values(model_mapping)), keys(model_mapping)),
-	)
-	vline!(p, [100, 300, 500, 700], linestyle = :dash, color = :grey, label = false)
-	savefig("icml2025/plots/minKSess.png")
+	# min KSESS, min KSESS / sec, min KSESS / cost
+	create_plot(df, :minKSess, "min KSESS", "minKSess", model_mapping, explorer_mapping, :topright)
+	df.minKSess_per_sec = df.minKSess ./ df.time
+	create_plot(df, :minKSess_per_sec, "min KSESS / sec", "minKSess_per_sec", model_mapping, explorer_mapping, :topright)
+	df_filtered = filter(row -> !(row.cost == 0), df) # need to remove 0 cost
+	df_filtered.minKSess_per_cost = df_filtered.minKSess ./ df_filtered.cost
+	create_plot(df_filtered, :minKSess_per_cost, "min KSESS / cost", "minKSess_per_cost", model_mapping, explorer_mapping, :topright)
 
-	# Create the grouped boxplot for minESS/sec, minESS/cost, minKSess/sec, minKSess/cost
-	# minESS / sec
-	df_summary = combine(groupby(df_filtered, [:model, :explorer])) do subdf
-		q25, med, q75 = quantile(subdf.miness_per_sec, [0.25, 0.5, 0.75])
-		(med = med, q25 = q25, q75 = q75)
-	end
-	df_summary.error_low = df_summary.med .- df_summary.q25
-	df_summary.error_high = df_summary.q75 .- df_summary.med
-	df_summary.model_index = getindex.(Ref(model_mapping), df_summary.model)
-	df_summary.explorer_shift = [explorer_mapping[e] for e in df_summary.explorer]
-	df_summary.position = df_summary.model_index .+ df_summary.explorer_shift
-	p = @df df_summary StatsPlots.scatter(
-		:position, :med, group = :explorer,
-		yerror = (df_summary.error_low, df_summary.error_high),  # IQR range
-		markersize = 8, markerstrokewidth = 1.5, marker = :circle,  # Large dots
-		xlabel = "Model", ylabel = "minESS / sec",
-		yaxis = :log10, legend = :bottomleft,
-		yticks = 10 .^ range(floor(log10(minimum(df_summary.q25))), ceil(log10(maximum(df_summary.q75))), length = 6),  # Auto log ticks
-		color = :auto,  # Ensure distinct colors per group
-		margin = 3Plots.mm,
-		xticks = (collect(values(model_mapping)), keys(model_mapping)),
-	)
-	vline!(p, [100, 300, 500, 700], linestyle = :dash, color = :grey, label = false)
-	savefig("icml2025/plots/miness_per_sec.png")
-	
-	# minESS / cost
-	df_summary = combine(groupby(df_filtered, [:model, :explorer])) do subdf
-		q25, med, q75 = quantile(subdf.miness_per_cost, [0.25, 0.5, 0.75])
-		(med = med, q25 = q25, q75 = q75)
-	end
-	df_summary.error_low = df_summary.med .- df_summary.q25
-	df_summary.error_high = df_summary.q75 .- df_summary.med
-	df_summary.model_index = getindex.(Ref(model_mapping), df_summary.model)
-	df_summary.explorer_shift = [explorer_mapping[e] for e in df_summary.explorer]
-	df_summary.position = df_summary.model_index .+ df_summary.explorer_shift
-	p = @df df_summary StatsPlots.scatter(
-		:position, :med, group = :explorer,
-		yerror = (df_summary.error_low, df_summary.error_high),  # IQR range
-		markersize = 8, markerstrokewidth = 1.5, marker = :circle,  # Large dots
-		xlabel = "Model", ylabel = "minESS / cost",
-		yaxis = :log10, legend = :bottomleft,
-		yticks = 10 .^ range(floor(log10(minimum(df_summary.q25))), ceil(log10(maximum(df_summary.q75))), length = 6),  # Auto log ticks
-		color = :auto,  # Ensure distinct colors per group
-		margin = 3Plots.mm,
-		xticks = (collect(values(model_mapping)), keys(model_mapping)),
-	)
-	vline!(p, [100, 300, 500, 700], linestyle = :dash, color = :grey, label = false)
-	savefig("icml2025/plots/miness_per_cost.png")
 
-	# min KSESS / sec
-	# Compute summary statistics: median, 25th percentile, and 75th percentile
-	df_summary = combine(groupby(df, [:model, :explorer])) do subdf
-		q25, med, q75 = quantile(subdf.minKSess_per_sec, [0.25, 0.5, 0.75])
-		(med = med, q25 = q25, q75 = q75)
-	end
-	# Calculate error bars (distance from median to Q25 and Q75)
-	df_summary.error_low = df_summary.med .- df_summary.q25
-	df_summary.error_high = df_summary.q75 .- df_summary.med
-	# Map model strings to numerical indices
-	df_summary.model_index = getindex.(Ref(model_mapping), df_summary.model)
-	# Define position shift for each explorer to avoid overlap
-	df_summary.explorer_shift = [explorer_mapping[e] for e in df_summary.explorer]
-	df_summary.position = df_summary.model_index .+ df_summary.explorer_shift
-	# Plot median as large dots with vertical IQR lines
-	p = @df df_summary StatsPlots.scatter(
-		:position, :med, group = :explorer,
-		yerror = (df_summary.error_low, df_summary.error_high),  # IQR range
-		markersize = 8, markerstrokewidth = 1.5, marker = :circle,  # Large dots
-		xlabel = "Model", ylabel = "min KSESS / sec",
-		yaxis = :log10, legend = :topright,
-		yticks = 10 .^ range(floor(log10(minimum(df_summary.q25))), ceil(log10(maximum(df_summary.q75))), length = 6),  # Auto log ticks
-		color = :auto,  # Ensure distinct colors per group
-		margin = 3Plots.mm,
-		xticks = (collect(values(model_mapping)), keys(model_mapping)),
-	)
-	# Add vertical dashed lines
-	vline!(p, [100, 300, 500, 700], linestyle = :dash, color = :grey, label = false)
-	# Save the figure
-	savefig("icml2025/plots/minKSess_per_sec.png")
-
-	# min KSESS / cost
-	df_filtered_no_cost = filter(row -> !(row.cost == 0), df) # need to remove 0 cost (alg fails)
-	df_filtered_no_cost.minKSess_per_cost = df_filtered_no_cost.minKSess ./ df_filtered_no_cost.cost
-	df_summary = combine(groupby(df_filtered_no_cost, [:model, :explorer])) do subdf
-		q25, med, q75 = quantile(subdf.minKSess_per_cost, [0.25, 0.5, 0.75])
-		(med = med, q25 = q25, q75 = q75)
-	end
-	df_summary.error_low = df_summary.med .- df_summary.q25
-	df_summary.error_high = df_summary.q75 .- df_summary.med
-	df_summary.model_index = getindex.(Ref(model_mapping), df_summary.model)
-	df_summary.explorer_shift = [explorer_mapping[e] for e in df_summary.explorer]
-	df_summary.position = df_summary.model_index .+ df_summary.explorer_shift
-	p = @df df_summary StatsPlots.scatter(
-		:position, :med, group = :explorer,
-		yerror = (df_summary.error_low, df_summary.error_high),  # IQR range
-		markersize = 8, markerstrokewidth = 1.5, marker = :circle,  # Large dots
-		xlabel = "Model", ylabel = "min KSESS / cost",
-		yaxis = :log10, legend = :topright,
-		yticks = 10 .^ range(floor(log10(minimum(df_summary.q25))), ceil(log10(maximum(df_summary.q75))), length = 6),  # Auto log ticks
-		color = :auto,  # Ensure distinct colors per group
-		margin = 3Plots.mm,
-		xticks = (collect(values(model_mapping)), keys(model_mapping)),
-	)
-	vline!(p, [100, 300, 500, 700], linestyle = :dash, color = :grey, label = false)
-	savefig("icml2025/plots/minKSess_per_cost.png")
 
 	# the energy jump plot
 	df_filtered_no_energy = filter(row -> !(row.energy_jump_dist == 0 || isnan(row.energy_jump_dist) || !isfinite(row.energy_jump_dist)), df) # need to remove 0 cost (alg fails)
@@ -251,11 +144,9 @@ function comparison_plots(df::DataFrame)
 	)
 	vline!(p, [100, 300, 500, 700], linestyle = :dash, color = :grey, label = false)
 	savefig("icml2025/plots/energy_jump.png")
+	
 	# the acceptance rate plot
 	df_filtered_no_ac = filter(row -> !(isnan(row.acceptance_prob)), df) # need to remove 0 cost (alg fails)
-	# @df df_filtered_no_ac StatsPlots.groupedboxplot(:model, :acceptance_prob, group = :explorer, xlabel = "Model",
-	# 	ylabel = "Average Acceptance Rate", legend = :outerright, color = :auto, ylim = (-0.03, 1.02),
-	# 	margin = 3Plots.mm)
 	df_summary = combine(groupby(df_filtered_no_ac, [:model, :explorer])) do subdf
 		q25, med, q75 = quantile(subdf.acceptance_prob, [0.25, 0.5, 0.75])
 		(med = med, q25 = q25, q75 = q75)
@@ -280,12 +171,6 @@ function comparison_plots(df::DataFrame)
 	savefig("icml2025/plots/accept_rate.png")
 end
 
-df1 = CSV.read("icml2025/exp_results_funnel2.csv", DataFrame)
-df2 = CSV.read("icml2025/exp_results_funnel100.csv", DataFrame)
-df3 = CSV.read("icml2025/exp_results_kilpisjarvi.csv", DataFrame)
-df4 = CSV.read("icml2025/exp_results_orbital.csv", DataFrame)
-df5 = CSV.read("icml2025/exp_results_mRNA.csv", DataFrame)
-# df6 = CSV.read("icml2025/exp_results_prostate.csv", DataFrame)
-df = vcat(df1, df2, df3, df4, df5)
+df = CSV.read("icml2025/exp_results_new.csv", DataFrame)
 
 comparison_plots(df)
