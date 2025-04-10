@@ -5,16 +5,17 @@ function main()
 	new_df = DataFrame(explorer = [], model = [], seed = [],
 		mean_1st_dim = [], var_1st_dim = [], time = [], n_logprob = [], n_steps = [], acceptance_prob = [], energy_jump_dist = [],
 		miness = [], minKSess = [], geyerESS = [])
-	for model in ["funnel2", "funnel100", "kilpisjarvi", "mRNA", "orbital"]
+	for model in ["mixture"] #["funnel2", "funnel100", "kilpisjarvi", "mRNA", "orbital"]
 		reference_samples = CSV.read("icml2025/samples/$(model).csv", DataFrame)
-		df = CSV.read("icml2025/exp_results_$(model).csv", DataFrame)
+		df = CSV.read("icml2025/exp_results_$(model)_temp1.csv", DataFrame)
 		model_dim = model == "funnel2" ? 2 :
             model == "funnel100" ? 100 :
             model == "kilpisjarvi" ? 3 :
             model == "mRNA" ? 5 :
             model == "orbital" ? 12 :
+			model == "mixture" ? 500 :
             error("Unknown model: $model")
-		for explorer in ["adaptive RWMH", "adaptive MALA", "AutoStep RWMH", "AutoStep MALA", "DRHMC", "HitAndRunSlicer", "NUTS"]
+		for explorer in ["adaptive RWMH", "AutoStep RWMH", "HitAndRunSlicer"]#["adaptive RWMH", "adaptive MALA", "AutoStep RWMH", "AutoStep MALA", "DRHMC", "HitAndRunSlicer", "NUTS"]
 			alg = if explorer == "adaptive RWMH"
 				"adaptive_rwmh"
 			elseif explorer == "adaptive MALA"
@@ -57,7 +58,7 @@ function main()
 				geyeress = ess(samples_1st_dim; autocov_method = FFTAutocovMethod(), maxlag = typemax(Int))
 				for j in 2:model_dim
 					xs = collect(samples[j, :])
-					if model == "funnel100"
+					if model == "funnel100" || model == "mixture"
 						minKSess = min(minKSess, KSess_two_sample(xs, collect(reference_samples[2, :])))
 					else
 						minKSess = min(minKSess, KSess_two_sample(xs, collect(reference_samples[j, :])))
@@ -71,7 +72,7 @@ function main()
 			end
 		end
 	end
-	CSV.write("icml2025/exp_results_new.csv", new_df)
+	CSV.write("icml2025/exp_results_mixture_new1.csv", new_df)
 end
 
 main()

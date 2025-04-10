@@ -1,5 +1,5 @@
 using AdvancedMH, Distributions, MCMCChains, LogDensityProblems, LinearAlgebra
-using CSV, DataFrames, DelimitedFiles, JSON, Turing, Random
+using CSV, DataFrames, DelimitedFiles, JSON, Turing
 include("utils.jl")
 
 # using NUTS in Turing.jl

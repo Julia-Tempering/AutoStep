@@ -1,8 +1,7 @@
 using Distributions, MCMCChains, LogDensityProblems, LinearAlgebra
-using CSV, DataFrames, DelimitedFiles, JSON, Random
-# include("utils.jl")
+using CSV, DataFrames, DelimitedFiles, JSON
+include("utils.jl")
 
-# using NUTS in Turing.jl
 function autostep2_sample_model(model, seed, explorer, n_rounds, adapt_precond)
 	# make model and data from the arguments
 	my_data = stan_data(model)
@@ -39,11 +38,8 @@ function autostep2_sample_model(model, seed, explorer, n_rounds, adapt_precond)
 	mean_1st_dim = mean(samples[:, 1])
 	var_1st_dim = var(samples[:, 1])
 	samples = [samples[i, :] for i in 1:size(samples, 1)]
-	println("start miness")
 	miness = min_ess_all_methods(samples, model)
-	println("start ksess")
 	# minKSess = min_KSess(samples, model)
-	println("start acceptance prob")
 	acceptance_prob = mean(exp.(log_accept))
 	energy_jump_dist = mean(ejumps)
 	stats_df = DataFrame(
@@ -157,7 +153,6 @@ function run_sampler(x0, kernel, f, θ0, target, sqrtdiagMhat, niter, rng)
 	grad_evals = zeros(niter)
 	for i ∈ 1:niter
 		x, logacc, ejump, cost, θ, grad_eval = kernel(x, f, θ0, target, sqrtdiagMhat, rng)
-		println(x)
 		xs[i, :] .= x
 		cs[i] = (i == 1) ? cost : cs[i-1] + cost
 		logas[i] = logacc
@@ -171,5 +166,5 @@ end
 
 # run_sampler(zeros(100), auto_step, fMALA, 1.0, Funnel(99, 2.0), ones(100), 100)
 
-# samples, stats_df = autostep2_sample_model("funnel2", 1, "AutoStep RWMH", 5, false)
+# samples, stats_df = autostep2_sample_model("mixture", 1, "AutoStep MALA", 10, false)
 # print(stats_df)

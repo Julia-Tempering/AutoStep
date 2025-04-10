@@ -1,5 +1,5 @@
-using AdvancedHMC, Distributions, MCMCChains, LogDensityProblems, LinearAlgebra
-using CSV, DataFrames, DelimitedFiles, JSON, Turing, Random, ReverseDiff
+using AdvancedHMC, Distributions, LogDensityProblems, LinearAlgebra
+using CSV, DataFrames, DelimitedFiles, JSON, Turing, ReverseDiff
 include("utils.jl")
 
 function adaptive_mala_sample_from_model(model, seed, n_rounds; max_samples = 2^25, kwargs...)

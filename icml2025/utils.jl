@@ -1,5 +1,5 @@
 using Statistics, StatsBase, LogDensityProblems, DataFrames, CSV, ReverseDiff, ForwardDiff
-using Suppressor, BridgeStan, HypothesisTests, Pigeons, JSON, LinearAlgebra
+using Suppressor, BridgeStan, HypothesisTests, Pigeons, JSON, LinearAlgebra, MCMCChains, Random
 
 # define orbital model 
 include("orbital_model_definition.jl")
@@ -24,10 +24,34 @@ function model_to_target(model)
 		return StanLogPotential("icml2025/data/kilpisjarvi.stan", "icml2025/data/kilpisjarvi_mod.json")
 	elseif startswith(model, "orbital")
 		return orbital_model
+	elseif startswith(model, "mixture")
+		return logdens_model("mixture", stan_data("mixture"))
 	else
 		error("unknown model $model")
 	end
 end
+
+# Define the Mixture model.
+struct Mixture
+    dim::Int
+    means::Vector{Vector{Float64}}   # list of mean vectors
+    covs::Vector{Vector{Float64}}    # list of covariance matrices
+    weights::Vector{Float64}         # mixture weights
+end
+function LogDensityProblems.logdensity(model::Mixture, x::AbstractVector)
+    logps = 0
+    for i in 1:length(model.weights)
+		logp = sum(logpdf.(Normal.(model.means[i], model.covs[i]), x))
+        logps += log(model.weights[i]) + logp
+    end
+    return sum(logps)
+end
+function (log_potential::Mixture)(x)
+    LogDensityProblems.logdensity(log_potential, x)
+end
+Pigeons.initialization(model::Mixture, ::AbstractRNG, ::Int) = zeros(model.dim)
+LogDensityProblems.dimension(model::Mixture) = model.dim
+LogDensityProblems.capabilities(::Mixture) = LogDensityProblems.LogDensityOrder{0}()
 
 # Define the Funnel model.
 struct Funnel
@@ -141,7 +165,7 @@ LogDensityProblems.dimension(model::Horseshoe) = 2 * model.d + 2
 LogDensityProblems.capabilities(::Horseshoe) = LogDensityProblems.LogDensityOrder{0}()
 
 # Define the function for log density and its gradient
-function LogDensityProblems.logdensity_and_gradient(model::Union{Funnel, mRNA, Kilpisjarvi, Horseshoe}, x)
+function LogDensityProblems.logdensity_and_gradient(model::Union{Funnel, mRNA, Kilpisjarvi, Horseshoe, Mixture}, x)
 	logp = LogDensityProblems.logdensity(model, x)
 	grad_logp = ReverseDiff.gradient(z -> LogDensityProblems.logdensity(model, z), x)
 	return logp, grad_logp
@@ -160,6 +184,8 @@ function logdens_model(model, data)
 		return Horseshoe(hcat(data["x"]...)', data["y"], data["n"], data["d"])
 	elseif startswith(model, "orbital")
 		return orbital_model
+	elseif startswith(model, "mixture")
+		return Mixture(data["dim"], data["means"], data["covs"], data["weights"])
 	else
 		error("unknown model $model")
 	end
@@ -172,6 +198,11 @@ function stan_data(model::String; dataset = nothing, dim = nothing, scale = noth
 		Dict("dim" => 99, "scale" => 6.0)
 	elseif startswith(model, "orbital")
 		nothing
+	elseif startswith(model, "mixture")
+		Dict("dim" => 500, 
+			"means" => [fill(-0.5, 500),fill(0.0, 500),fill(0.5, 500)],
+			"covs" => [fill(0.5, 500), fill(1, 500), vcat(0.1, fill(1, 499))],
+			"weights" => [0.3, 0.4, 0.3])
 	else
 		file_name = if startswith(model, "kilpisjarvi")
 			"kilpisjarvi_mod"
@@ -211,8 +242,8 @@ min_ess_batch(samples) =
 function min_ess_chains(samples)
 	chn = to_chains(samples)
 	min(
-		minimum(ess(chn).nt.ess),            # default is :bulk which computes ess on rank-normalized vars
-		minimum(ess(chn, kind = :basic).nt.ess), # :basic is actual ess of the vars.
+		minimum(MCMCChains.ess(chn).nt.ess),                # default is :bulk which computes ess on rank-normalized vars
+		minimum(MCMCChains.ess(chn, kind = :basic).nt.ess), # :basic is actual ess of the vars.
 	)
 end
 

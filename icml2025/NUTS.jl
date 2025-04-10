@@ -1,5 +1,5 @@
 using AdvancedHMC, Distributions, MCMCChains, LogDensityProblems, LinearAlgebra
-using CSV, DataFrames, DelimitedFiles, JSON, Random, ReverseDiff
+using CSV, DataFrames, DelimitedFiles, JSON, ReverseDiff
 include("utils.jl")
 
 # using NUTS in Turing.jl

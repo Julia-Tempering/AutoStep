@@ -1,6 +1,5 @@
 include("utils.jl")
 using Distributions, LinearAlgebra, ReverseDiff, MCMCChains
-using Random
 
 
 # Combined Delayed Rejection HMC sampling function
