@@ -1,9 +1,9 @@
-include("adaptiveRWMH.jl")
-include("adaptiveMALA.jl")
-include("nuts.jl")
-include("drhmc.jl")
-include("autostep.jl")
-include("autostep2.jl")
+include("samplers/adaptiveRWMH.jl")
+include("samplers/adaptiveMALA.jl")
+include("samplers/nuts.jl")
+include("samplers/drhmc.jl")
+include("samplers/autostep.jl")
+include("samplers/autostep2.jl")
 
 function main()
 
@@ -55,28 +55,28 @@ function main()
 			append!(exp_results, stats_rwmh)
 			samples_rwmh = nothing
 
-			# samples_automala, stats_automala = autostep_sample_model(model, seed, "AutoStep MALA", n_rounds, false)
-			# CSV.write("icml2025/temp/$(seed)_$(model)_automala.csv", DataFrame(samples_automala, :auto))
-			# append!(exp_results, stats_automala)
-			# samples_automala = nothing
+			samples_automala, stats_automala = autostep_sample_model(model, seed, "AutoStep MALA", n_rounds, false)
+			CSV.write("icml2025/temp/$(seed)_$(model)_automala.csv", DataFrame(samples_automala, :auto))
+			append!(exp_results, stats_automala)
+			samples_automala = nothing
 
-			# samples_mala, stats_mala = adaptive_mala_sample_from_model(model, seed, n_rounds)
-			# CSV.write("icml2025/temp/$(seed)_$(model)_adaptive_mala.csv", DataFrame(samples_mala, :auto))
-			# append!(exp_results, stats_mala)
-			# samples_mala = nothing
+			samples_mala, stats_mala = adaptive_mala_sample_from_model(model, seed, n_rounds)
+			CSV.write("icml2025/temp/$(seed)_$(model)_adaptive_mala.csv", DataFrame(samples_mala, :auto))
+			append!(exp_results, stats_mala)
+			samples_mala = nothing
 
-			# samples_nuts, stats_nuts = nuts_sample_from_model(model, seed, n_rounds)
-			# CSV.write("icml2025/temp/$(seed)_$(model)_nuts.csv", DataFrame(samples_nuts, :auto))
-			# append!(exp_results, stats_nuts)
-			# samples_nuts = nothing
+			samples_nuts, stats_nuts = nuts_sample_from_model(model, seed, n_rounds)
+			CSV.write("icml2025/temp/$(seed)_$(model)_nuts.csv", DataFrame(samples_nuts, :auto))
+			append!(exp_results, stats_nuts)
+			samples_nuts = nothing
 
-			# samples_drhmc, stats_drhmc = drhmc_sample_from_model(model, seed, n_rounds)
-			# CSV.write("icml2025/temp/$(seed)_$(model)_drhmc.csv", DataFrame(samples_drhmc, :auto))
-			# append!(exp_results, stats_drhmc)
-			# samples_drhmc = nothing
+			samples_drhmc, stats_drhmc = drhmc_sample_from_model(model, seed, n_rounds)
+			CSV.write("icml2025/temp/$(seed)_$(model)_drhmc.csv", DataFrame(samples_drhmc, :auto))
+			append!(exp_results, stats_drhmc)
+			samples_drhmc = nothing
 
 			println("Finish seed $seed")
-			CSV.write("icml2025/exp_results_$(model)_temp1.csv", exp_results)
+			CSV.write("icml2025/exp_results_$(model).csv", exp_results)
 		end
 	end
 

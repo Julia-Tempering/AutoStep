@@ -20,6 +20,8 @@ function log_prob_gradient_ratio(model::AbstractString)
 		72.55113583072277 # 71.0349931437466
 	elseif startswith(model, "funnel2")
 		5.960239505901212 # 5.916476226247743
+	elseif startswith(model, "mixture")
+        3.9580342298288507 # 3.8667905638320192
 	else
 		throw(KeyError(model))
 	end
@@ -171,6 +173,6 @@ function comparison_plots(df::DataFrame)
 	savefig("icml2025/plots/accept_rate.png")
 end
 
-df = CSV.read("icml2025/exp_results_new.csv", DataFrame)
+df = CSV.read("icml2025/results/exp_results_new.csv", DataFrame)
 
 comparison_plots(df)

@@ -5,7 +5,7 @@ function main()
 	new_df = DataFrame(explorer = [], model = [], seed = [],
 		mean_1st_dim = [], var_1st_dim = [], time = [], n_logprob = [], n_steps = [], acceptance_prob = [], energy_jump_dist = [],
 		miness = [], minKSess = [], geyerESS = [])
-	for model in ["mixture"] #["funnel2", "funnel100", "kilpisjarvi", "mRNA", "orbital"]
+	for model in ["mixture", "funnel2", "funnel100", "kilpisjarvi", "mRNA", "orbital"]
 		reference_samples = CSV.read("icml2025/samples/$(model).csv", DataFrame)
 		df = CSV.read("icml2025/exp_results_$(model)_temp1.csv", DataFrame)
 		model_dim = model == "funnel2" ? 2 :
@@ -15,7 +15,7 @@ function main()
             model == "orbital" ? 12 :
 			model == "mixture" ? 500 :
             error("Unknown model: $model")
-		for explorer in ["adaptive RWMH", "AutoStep RWMH", "HitAndRunSlicer"]#["adaptive RWMH", "adaptive MALA", "AutoStep RWMH", "AutoStep MALA", "DRHMC", "HitAndRunSlicer", "NUTS"]
+		for explorer in ["adaptive RWMH", "adaptive MALA", "AutoStep RWMH", "AutoStep MALA", "DRHMC", "HitAndRunSlicer", "NUTS"]
 			alg = if explorer == "adaptive RWMH"
 				"adaptive_rwmh"
 			elseif explorer == "adaptive MALA"
@@ -72,7 +72,7 @@ function main()
 			end
 		end
 	end
-	CSV.write("icml2025/exp_results_mixture_new1.csv", new_df)
+	CSV.write("icml2025/results/exp_results_$(model).csv", new_df)
 end
 
 main()
